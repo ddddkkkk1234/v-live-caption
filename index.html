@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpine Dynamics :: Neon Frost - Knee Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 컬러 팔레트: 다크 우주 + 네온 포인트 */
+            --bg-space: #050509;
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --neon-green: #39ff14;
+            --neon-blue: #00d4ff;
+            --neon-gold: #ffd700;
+            --neon-red: #ff3131;
+            --text-main: #e0e0e0;
+            --text-muted: #888;
+            --font-main: 'Montserrat', sans-serif;
+            --font-digit: 'Orbitron', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-space);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            overflow: hidden; /* 전체 페이지 스크롤 방지 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 메인 컨테이너 (레이아웃) */
+        .app-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 비디오 2, 대시보드 1 비율 */
+            gap: 20px;
+            width: 95%;
+            height: 90vh;
+            max-width: 1600px;
+        }
+
+        /* 비디오 섹션 */
+        .video-section {
+            position: relative;
+            background-color: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.1);
+        }
+
+        #input_video, #output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 화면에 꽉 차게 */
+        }
+
+        #output_canvas {
+            z-index: 10; /* AI 관절은 비디오 위에 */
+        }
+
+        /* 로딩/오버레이 효과 (네온 그라데이션) */
+        .overlay-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(0, 212, 255, 0.1) 0%, rgba(5, 5, 9, 0) 70%);
+            z-index: 5;
+            pointer-events: none; /* 클릭 관통 */
+        }
+
+        /* 대시보드 섹션 */
+        .dashboard-section {
+            background-color: var(--bg-glass);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glass);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .header-text h1 {
+            font-size: 1.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(to right, #fff, var(--neon-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-text p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        /* 다국어 선택기 */
+        .lang-selector {
+            display: flex;
+            gap: 8px;
+        }
+
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+
+        .lang-btn:hover, .lang-btn.active {
+            border-color: var(--neon-blue);
+            color: var(--neon-blue);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        /* 분석 결과 (스탯 박스) */
+        .analysis-results h2 {
+            font-size: 1.2rem;
+            color: var(--neon-gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .stat-box {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+        }
+
+        .stat-box:hover {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+            transform: translateY(-3px);
+        }
+
+        .stat-box .label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .stat-box .value {
+            font-family: var(--font-digit);
+            font-size: 2.5rem;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        /* 부상 위험도 표시기 */
+        .risk-assessment {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .risk-assessment h2 {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        #riskLevel {
+            font-family: var(--font-digit);
+            font-size: 2rem;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        /* 위험도에 따른 동적 색상 */
+        .risk-low { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+        .risk-mid { color: var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold); }
+        .risk-high { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); }
+
+        /* 컨트롤 패널 (버튼) */
+        .control-panel button {
+            width: 100%;
+            background-color: #1a1a1a;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-family: var(--font-main);
+        }
+
+        .control-panel button:hover {
+            background-color: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <section class="video-section">
+            <video id="input_video" controls></video>
+            <canvas id="output_canvas"></canvas>
+            <div class="overlay-effect"></div>
+        </section>
+
+        <aside class="dashboard-section">
+            <header>
+                <div class="header-text">
+                    <h1 id="ui_title">Alpine Dynamics</h1>
+                    <p id="ui_subtitle">National Athlete Joint Analysis - Knee Sync v0.2</p>
+                </div>
+                <div class="lang-selector">
+                    <button class="lang-btn" onclick="setLanguage('ko')">KR</button>
+                    <button class="lang-btn" onclick="setLanguage('en')">EN</button>
+                    <button class="lang-btn" onclick="setLanguage('ja')">JP</button>
+                    <button class="lang-btn" onclick="setLanguage('zh')">CN</button>
+                </div>
+            </header>
+
+            <div class="analysis-results">
+                <h2 id="ui_realtime_data">Real-time Data</h2>
+                <div class="stats-grid">
+                    <div class="stat-box" id="leftKneeBox">
+                        <span class="label" id="ui_left_knee">Left Knee Angle</span>
+                        <span class="value" id="leftKneeAngle">0°</span>
+                    </div>
+                    <div class="stat-box" id="rightKneeBox">
+                        <span class="label" id="ui_right_knee">Right Knee Angle</span>
+                        <span class="value" id="rightKneeAngle">0°</span>
+                    </div>
+                    <div class="stat-box" id="torsoBox">
+                        <span class="label" id="ui_torso_lean">Torso Lean</span>
+                        <span class="value" id="torsoLean">0°</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="risk-assessment">
+                <h2 id="ui_injury_risk">Injury Risk (AI)</h2>
+                <p id="riskLevel" class="risk-low">Safe</p>
+            </div>
+
+            <div class="control-panel">
+                <button id="start_webcam">Webcam Analysis</button>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+
+    <script>
+        // --- 0. 다국어 데이터 ---
+        const i18n = {
+            ko: {
+                title: "알파인 다이내믹스",
+                subtitle: "국가대표 관절 분석 - 무릎 동기화 v0.2",
+                realtime_data: "실시간 데이터",
+                left_knee: "왼쪽 무릎 각도",
+                right_knee: "오른쪽 무릎 각도",
+                torso_lean: "상체 기울기",
+                injury_risk: "부상 위험도 (AI)",
+                start_webcam: "웹캠 분석 시작",
+                risk_safe: "안전",
+                risk_warning: "주의",
+                risk_critical: "위험"
+            },
+            en: {
+                title: "Alpine Dynamics",
+                subtitle: "National Athlete Joint Analysis - Knee Sync v0.2",
+                realtime_data: "Real-time Data",
+                left_knee: "Left Knee Angle",
+                right_knee: "Right Knee Angle",
+                torso_lean: "Torso Lean",
+                injury_risk: "Injury Risk (AI)",
+                start_webcam: "Start Webcam Analysis",
+                risk_safe: "Safe",
+                risk_warning: "Warning",
+                risk_critical: "Critical"
+            },
+            ja: {
+                title: "アルパイン・ダイナミクス",
+                subtitle: "代表選手関節分析 - 膝同期 v0.2",
+                realtime_data: "リアルタイムデータ",
+                left_knee: "左膝の角度",
+                right_knee: "右膝の角度",
+                torso_lean: "体幹의 傾き",
+                injury_risk: "負傷リスク (AI)",
+                start_webcam: "分析開始",
+                risk_safe: "安全",
+                risk_warning: "注意",
+                risk_critical: "危険"
+            },
+            zh: {
+                title: "阿尔派动力",
+                subtitle: "国家队运动员关节分析 - 膝盖同步 v0.2",
+                realtime_data: "实时数据",
+                left_knee: "左膝角度",
+                right_knee: "右膝角度",
+                torso_lean: "躯干倾斜",
+                injury_risk: "受伤风险 (AI)",
+                start_webcam: "开始分析",
+                risk_safe: "安全",
+                risk_warning: "警告",
+                risk_critical: "危险"
+            }
+        };
+
+        let currentLang = localStorage.getItem('selectedLang') || 'ko';
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('selectedLang', lang);
+            
+            // 텍스트 업데이트
+            document.getElementById('ui_title').innerText = i18n[lang].title;
+            document.getElementById('ui_subtitle').innerText = i18n[lang].subtitle;
+            document.getElementById('ui_realtime_data').innerText = i18n[lang].realtime_data;
+            document.getElementById('ui_left_knee').innerText = i18n[lang].left_knee;
+            document.getElementById('ui_right_knee').innerText = i18n[lang].right_knee;
+            document.getElementById('ui_torso_lean').innerText = i18n[lang].torso_lean;
+            document.getElementById('ui_injury_risk').innerText = i18n[lang].injury_risk;
+            document.getElementById('start_webcam').innerText = i18n[lang].start_webcam;
+
+            // 버튼 활성화 스타일
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.toLowerCase() === (lang === 'ja' ? 'jp' : lang === 'zh' ? 'cn' : lang));
+            });
+        }
+
+        // 초기 언어 설정
+        setLanguage(currentLang);
+
+        // --- 1. DOM 요소 가져오기 ---
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        
+        // 대시보드 스탯 요소
+        const leftKneeAngleText = document.getElementById('leftKneeAngle');
+        const rightKneeAngleText = document.getElementById('rightKneeAngle');
+        const torsoLeanText = document.getElementById('torsoLean');
+        const riskLevelText = document.getElementById('riskLevel');
+
+        // --- 2. 미디어파이프 포즈 설정 (핵심 AI 로직) ---
+        const pose = new Pose({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }});
+        
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        // --- 3. 분석 결과 처리 함수 ---
+        function onResults(results) {
+            if (!results.poseLandmarks) return;
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#888', lineWidth: 1});
+            drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#e0e0e0', lineWidth: 0.5, radius: 2});
+
+            const landmarks = results.poseLandmarks;
+
+            function calculateAngle(a, b, c) {
+                const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+                let angle = Math.abs(radians * 180.0 / Math.PI);
+                if (angle > 180.0) angle = 360.0 - angle;
+                return Math.round(angle);
+            }
+
+            const leftHip = landmarks[23]; const leftKnee = landmarks[25]; const leftAnkle = landmarks[27];
+            const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+            leftKneeAngleText.innerText = `${leftKneeAngle}°`;
+
+            const rightHip = landmarks[24]; const rightKnee = landmarks[26]; const rightAnkle = landmarks[28];
+            const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+            rightKneeAngleText.innerText = `${rightKneeAngle}°`;
+
+            const leftShoulder = landmarks[11]; const rightShoulder = landmarks[12];
+            const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
+            const hipMidY = (leftHip.y + rightHip.y) / 2;
+            const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+            const hipMidX = (leftHip.x + rightHip.x) / 2;
+            const torsoLean = Math.round(Math.abs(Math.atan2(shoulderMidY - hipMidY, shoulderMidX - hipMidX) * 180.0 / Math.PI) - 90);
+            torsoLeanText.innerText = `${torsoLean}°`;
+
+            // 위험도 판단 및 다국어 텍스트 적용
+            if (leftKneeAngle < 100 || rightKneeAngle < 100) {
+                riskLevelText.innerText = i18n[currentLang].risk_critical;
+                riskLevelText.className = "risk-high";
+            } else if (leftKneeAngle < 120 || rightKneeAngle < 120) {
+                riskLevelText.innerText = i18n[currentLang].risk_warning;
+                riskLevelText.className = "risk-mid";
+            } else {
+                riskLevelText.innerText = i18n[currentLang].risk_safe;
+                riskLevelText.className = "risk-low";
+            }
+
+            canvasCtx.restore();
+        }
+
+        pose.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                await pose.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+
+        document.getElementById('start_webcam').addEventListener('click', () => {
+            camera.start();
+            document.getElementById('start_webcam').style.display = 'none';
+        });
+
+    </script>
+</body>
+</html>
