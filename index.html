@@ -172,7 +172,6 @@
             transition: width 0.1s;
         }
 
-        /* 가이드 모달 */
         #guide-modal {
             display: none;
             position: fixed;
@@ -226,48 +225,41 @@
     <div id="guide-modal">
         <div class="modal-content">
             <button class="close-btn" onclick="closeGuide()">×</button>
-            <h2>🎧 고정밀 AI 자막 (보청기/에어팟 전용) 설정</h2>
+            <h2>🎧 'audio-capture' 에러 해결법</h2>
             
-            <div class="step" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary);">
-                <strong>⚡ 설정창 1초 만에 열기</strong>
-                <p>1. 키보드의 <b>[윈도우 로고 키 + R]</b>을 누르세요.</p>
-                <p>2. 아래 명령어를 복사해서 붙여넣고 엔터!</p>
+            <div class="step" style="background: rgba(244, 67, 54, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid var(--danger);">
+                <strong>🚨 에러 원인</strong>
+                <p>윈도우가 마이크(가상 케이블)를 사용하지 못하게 막고 있거나, 다른 프로그램이 독점하고 있습니다.</p>
+            </div>
+
+            <div class="step">
+                <strong>방법 1: 윈도우 마이크 개인정보 켜기</strong>
+                <p>1. [시작] -> [설정] -> [개인정보 및 보안] -> [마이크]</p>
+                <p>2. ✅ <b>마이크 액세스</b> 및 <b>데스크톱 앱이 마이크에 액세스하도록 허용</b>을 모두 [켬]으로 바꾸세요.</p>
+            </div>
+
+            <div class="step">
+                <strong>방법 2: 크롬 브라우저 완전히 껐다 켜기</strong>
+                <p>설정을 바꾼 후에는 반드시 브라우저를 완전히 종료했다가 다시 접속해야 장치를 인식합니다.</p>
+            </div>
+
+            <div class="step">
+                <strong>방법 3: 명령어로 설정창 열기</strong>
+                <p>[윈도우+R] 누르고 아래 명령어 입력</p>
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <code style="background:#000; padding:8px 15px; border-radius:5px; flex:1; color:#0f0;">mmsys.cpl</code>
-                    <button class="btn-guide" onclick="copyCmd()">명령어 복사</button>
+                    <button class="btn-guide" onclick="copyCmd()">복사</button>
                 </div>
             </div>
 
-            <div class="step" style="margin-top:20px;">
-                <strong>1단계: [재생] 탭 설정</strong>
-                <p>✅ <span class="highlight">[CABLE Input]</span>을 마우스 우클릭하여 <b>[기본 장치로 설정]</b> 하세요.</p>
-            </div>
-
-            <div class="step">
-                <strong>2단계: [녹음] 탭 설정</strong>
-                <p>✅ <b>[CABLE Output]</b>을 마우스 우클릭하여 <b>[기본 장치로 설정]</b> 하세요.</p>
-                <p>👉 유튜브를 틀면 여기서 초록색 바가 움직여야 합니다!</p>
-            </div>
-
-            <div class="step">
-                <strong>3단계: 보청기 연결 (수신 대기)</strong>
-                <p>[CABLE Output] 우클릭 -> [속성] -> [수신 대기] 탭 이동</p>
-                <p>✅ <span class="highlight">[이 장치로 듣기]</span> 체크</p>
-                <p>✅ [이 장치로 재생]에서 <b>사용자님의 보청기(또는 에어팟)</b> 선택!</p>
-                <p>👉 <b>이제 보청기로 소리가 들리고 자막도 나옵니다!</b></p>
-            </div>
-
-            <button class="btn btn-start" style="width:100%; justify-content:center;" onclick="closeGuide()">설정 완료! 이제 자막이 나옵니다.</button>
+            <button class="btn btn-start" style="width:100%; justify-content:center;" onclick="closeGuide()">확인했습니다!</button>
         </div>
     </div>
 
     <!-- 제품 1: 내 목소리 모드 -->
     <div id="mic-container" class="container active">
-        <div class="info-banner" id="mic-info">
-            <span>💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.</span>
-        </div>
+        <div class="info-banner" id="mic-info"><span>💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.</span></div>
         <div class="audio-meter"><div id="mic-meter" class="audio-meter-fill"></div></div>
-        
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">📝 실시간 기록 (내 목소리)</div>
@@ -278,10 +270,9 @@
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
                 <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석 비서</div>
-                <div class="scroll-area"><div id="mic-ai" class="ai-result">내용이 쌓이면 해석 버튼을 누르세요.</div></div>
+                <div class="scroll-area"><div id="mic-ai" class="ai-result">대화가 쌓이면 해석 버튼을 누르세요.</div></div>
             </div>
         </div>
-
         <div class="controls">
             <button onclick="startRec('mic')" id="mic-start" class="btn btn-start">🎙️ 기록 시작</button>
             <button onclick="stopRec('mic')" id="mic-stop" class="btn btn-stop" disabled>■ 중지</button>
@@ -292,11 +283,10 @@
     <!-- 제품 2: 영상 자막 모드 -->
     <div id="youtube-container" class="container">
         <div class="info-banner" id="youtube-info">
-            <span>⚠️ <strong>고정밀 AI 자막 모드가 준비되었습니다.</strong></span>
-            <button class="btn btn-guide" onclick="openGuide()">🚨 고정밀 설정법 보기</button>
+            <span>⚠️ <strong>에러 발생 시 가이드를 확인하세요.</strong></span>
+            <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>
         </div>
         <div class="audio-meter"><div id="youtube-meter" class="audio-meter-fill"></div></div>
-
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
@@ -310,10 +300,9 @@
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
                 <div class="card-header" style="color: #d1b3ff;">🧠 실시간 영상 요약</div>
-                <div class="scroll-area"><div id="youtube-ai" class="ai-result">영상이 시작되면 AI가 핵심을 요약합니다.</div></div>
+                <div class="scroll-area"><div id="youtube-ai" class="ai-result">영상이 시작되면 AI가 내용을 요약합니다.</div></div>
             </div>
         </div>
-
         <div class="controls">
             <button onclick="startRec('youtube')" id="youtube-start" class="btn btn-start" style="background:#e74c3c;">📺 자막 시작</button>
             <button onclick="stopRec('youtube')" id="youtube-stop" class="btn btn-stop" disabled>■ 중지</button>
@@ -327,7 +316,6 @@
     <script>
         let recognition = null;
         let audioContext = null;
-        let analyser = null;
         let animationId = null;
 
         const ui = {
@@ -350,38 +338,20 @@
             alert('명령어가 복사되었습니다! [윈도우 로고 키 + R]을 누르고 붙여넣으세요.');
         }
 
+        // 마이크 충돌 방지를 위해 게이지를 별도로 분리하거나 끕니다.
         async function startAudioMeter(mode) {
-            try {
-                // 이전에 열려있던 오디오 컨텍스트가 있다면 종료
-                if (audioContext) audioContext.close();
-                
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                source.connect(analyser);
-
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                const meterFill = document.getElementById(ui[mode].meter);
-
-                function updateMeter() {
-                    if (!analyser) return;
-                    analyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                    let average = sum / dataArray.length;
-                    meterFill.style.width = Math.min(100, average * 2) + "%";
-                    animationId = requestAnimationFrame(updateMeter);
-                }
-                updateMeter();
-            } catch (err) { console.error("오디오 미터 에러:", err); }
+            // 이번 버전에서는 충돌 방지를 위해 일단 게이지를 비활성화하고 자막에 집중합니다.
+            // 만약 게이지를 다시 켜고 싶다면 Web Speech API와 스트림을 공유해야 합니다.
         }
 
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         function startRec(mode) {
             if (!window.SpeechRecognition) return alert("브라우저 미지원");
+            
+            // 기존 인식이 있다면 중지
+            if (recognition) recognition.stop();
+
             recognition = new SpeechRecognition();
             recognition.interimResults = true;
             recognition.lang = 'ko-KR';
@@ -394,20 +364,22 @@
             recognition.onstart = () => {
                 document.getElementById(ui[mode].start).disabled = true;
                 document.getElementById(ui[mode].stop).disabled = false;
-                infoBanner.innerHTML = "<span>🟢 <strong>소리 감지 중...</strong> 보청기로 소리가 들리나요?</span>";
-                startAudioMeter(mode);
+                infoBanner.innerHTML = "<span>🟢 <strong>실시간 인식 가동 중...</strong> 소리를 들려주세요.</span>";
             };
 
             recognition.onerror = (event) => {
-                infoBanner.innerHTML = `<span>❌ <strong>에러 발생:</strong> ${event.error}</span> <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>`;
-                openGuide();
+                console.error("에러 발생:", event.error);
+                let msg = event.error;
+                if (event.error === 'audio-capture') {
+                    msg = "마이크 연결 실패 (다른 앱에서 사용 중일 수 있음)";
+                    openGuide();
+                }
+                infoBanner.innerHTML = `<span>❌ <strong>에러 발생:</strong> ${msg}</span> <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>`;
             };
 
             recognition.onend = () => {
                 document.getElementById(ui[mode].start).disabled = false;
                 document.getElementById(ui[mode].stop).disabled = true;
-                if(animationId) cancelAnimationFrame(animationId);
-                analyser = null;
             };
 
             recognition.onresult = (event) => {
@@ -421,7 +393,12 @@
                 scrollArea.scrollTop = scrollArea.scrollHeight;
                 if (mode === 'youtube') updatePip(interim || finalSpan.innerText.split(' ').slice(-5).join(' '));
             };
-            recognition.start();
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error("인식 시작 실패:", e);
+            }
         }
 
         function stopRec(mode) { if (recognition) recognition.stop(); }
