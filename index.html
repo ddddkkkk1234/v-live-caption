@@ -3,22 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- SEO 및 소셜 미디어 공유 설정 (Open Graph) -->
-    <title>V-Live Caption | AI 실시간 받아쓰기</title>
-    <meta name="description" content="설치 없이 브라우저에서 바로 쓰는 고성능 AI 실시간 음성 인식 자막 서비스입니다.">
-    <meta property="og:title" content="V-Live Caption | 무료 실시간 자막">
-    <meta property="og:description" content="야외에서도, 강의에서도! 내 목소리를 실시간으로 텍스트로 변환해보세요.">
-    <meta property="og:type" content="website">
-    <!-- og:image는 나중에 실제 서비스 로고 이미지 URL로 변경하세요 -->
-    <meta property="og:image" content="https://via.placeholder.com/800x400/1a1a1a/ffffff?text=V-Live+Caption">
-    
-    <!-- 파비콘 (임시 이모지 사용, 나중에 .ico 파일로 교체 권장) -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+    <title>V-Live Caption | AI 실시간 해석</title>
+    <meta name="description" content="AI가 실시간으로 음성을 받아쓰고, 그 의도까지 해석해줍니다.">
+    <meta property="og:title" content="V-Live Caption | AI 실시간 해석">
+    <meta property="og:description" content="단순한 받아쓰기를 넘어, AI가 대화의 핵심을 짚어줍니다.">
+    <meta property="og:image" content="https://via.placeholder.com/800x400/1a1a1a/ffffff?text=AI+Live+Caption">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
 
     <style>
         :root {
             --primary: #4CAF50;
+            --ai-accent: #8E44AD; /* AI 해석 강조색 (보라색) */
             --danger: #f44336;
             --bg-color: #121212;
             --surface: #1e1e1e;
@@ -36,7 +31,6 @@
             margin: 0;
         }
 
-        /* 상단 네비게이션 (로그인) */
         header {
             display: flex;
             justify-content: space-between;
@@ -46,255 +40,248 @@
             border-bottom: 1px solid #333;
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-        }
-
-        .login-btn {
-            background: transparent;
-            color: var(--text-main);
-            border: 1px solid #555;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .login-btn:hover {
-            background: #333;
-        }
-
-        /* 메인 컨텐츠 영역 */
-        main {
+        .container {
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 2rem 1rem;
-        }
-
-        #caption-container {
+            padding: 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
             width: 100%;
-            max-width: 800px;
+            box-sizing: border-box;
+            gap: 1rem;
+        }
+
+        /* 메인 레이아웃: 받아쓰기와 AI 해석을 나란히 (PC) / 위아래 (모바일) */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        @media (max-width: 800px) {
+            .content-grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
             background: var(--surface);
-            padding: 1.5rem;
             border-radius: 12px;
-            height: 40vh;
-            min-height: 250px;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             border: 1px solid #333;
-            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
 
-        #final-text {
-            color: var(--text-main);
-            font-size: 1.2rem;
+        .card-header {
+            padding: 0.8rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid #333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .scroll-area {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            height: 40vh;
             line-height: 1.6;
         }
 
-        #interim-text {
-            color: var(--text-muted);
-            font-size: 1.2rem;
-            line-height: 1.6;
-            font-style: italic;
+        #final-text { color: var(--text-main); font-size: 1.1rem; }
+        #interim-text { color: var(--text-muted); font-size: 1.1rem; font-style: italic; }
+
+        /* AI 해석 스타일 */
+        #ai-interpretation {
+            color: #d1b3ff;
+            font-size: 1.1rem;
+            white-space: pre-wrap;
         }
 
         .controls {
             display: flex;
-            gap: 1rem;
-            width: 100%;
-            max-width: 400px;
+            gap: 10px;
+            justify-content: center;
+            padding: 1rem 0;
         }
 
-        .action-btn {
-            flex: 1;
-            padding: 1rem;
-            font-size: 1.1rem;
-            font-weight: bold;
-            border: none;
+        .btn {
+            padding: 0.8rem 1.5rem;
             border-radius: 8px;
+            border: none;
+            font-weight: bold;
             cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .action-btn:active {
-            transform: scale(0.98);
-        }
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .action-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
+        .btn-start { background: var(--primary); color: white; }
+        .btn-stop { background: var(--danger); color: white; }
+        .btn-ai { background: var(--ai-accent); color: white; }
 
-        #start-btn { background-color: var(--primary); color: white; }
-        #stop-btn { background-color: var(--danger); color: white; }
-
-        .status-box {
-            margin-top: 1.5rem;
-            padding: 0.8rem 1.2rem;
-            border-radius: 6px;
-            font-size: 0.95rem;
+        .status-bar {
             text-align: center;
-            background: rgba(255, 255, 255, 0.05);
-            max-width: 800px;
-            width: 100%;
-            box-sizing: border-box;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
         }
 
-        .error-text { color: #ff9800; }
-
-        /* 하단 법적 고지 및 지원 (Footer) */
         footer {
-            padding: 1.5rem;
+            padding: 1rem;
             text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
-            border-top: 1px solid #333;
-            background-color: var(--surface);
+            background: var(--surface);
         }
 
-        footer a {
-            color: var(--text-muted);
-            text-decoration: none;
-            margin: 0 10px;
+        /* 애니메이션 효과 */
+        .typing::after {
+            content: "|";
+            animation: blink 1s infinite;
         }
-
-        footer a:hover {
-            text-decoration: underline;
-            color: var(--text-main);
-        }
-
-        /* 스크롤바 커스텀 */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); }
-        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #777; }
-
-        /* 모바일 최적화 */
-        @media (max-width: 600px) {
-            #final-text, #interim-text { font-size: 1.1rem; }
-            header h1 { font-size: 1.2rem; }
-            .controls { flex-direction: column; }
-        }
+        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
-    
+
     <header>
         <h1>🎙️ V-Live Caption</h1>
-        <button class="login-btn" onclick="alert('구글 로그인 기능은 Firebase 연동 후 활성화됩니다.')">로그인</button>
+        <button class="btn" style="background:#333; border:1px solid #555; font-size:0.8rem;">로그인</button>
     </header>
 
-    <main>
-        <div id="caption-container">
-            <span id="final-text"></span>
-            <span id="interim-text"></span>
+    <div class="container">
+        <div class="status-bar" id="status-bar">마이크 버튼을 눌러 시작하세요.</div>
+
+        <div class="content-grid">
+            <!-- 1. 받아쓰기 카드 -->
+            <div class="card">
+                <div class="card-header">📝 실시간 받아쓰기</div>
+                <div class="scroll-area" id="caption-scroll">
+                    <span id="final-text"></span>
+                    <span id="interim-text" class="typing"></span>
+                </div>
+            </div>
+
+            <!-- 2. AI 해석 카드 -->
+            <div class="card" style="border-color: var(--ai-accent);">
+                <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석</div>
+                <div class="scroll-area" id="ai-scroll">
+                    <div id="ai-interpretation">사용자가 말을 하면 AI가 요점과 의도를 분석하여 이곳에 표시합니다.</div>
+                </div>
+            </div>
         </div>
 
         <div class="controls">
-            <button id="start-btn" class="action-btn">시작하기</button>
-            <button id="stop-btn" class="action-btn" disabled>중지하기</button>
+            <button id="start-btn" class="btn btn-start">▶ 시작하기</button>
+            <button id="stop-btn" class="btn btn-stop" disabled>■ 중지하기</button>
+            <button id="ai-btn" class="btn btn-ai">✨ AI 해석하기</button>
         </div>
-
-        <div id="status" class="status-box">마이크 권한을 허용하고 시작 버튼을 눌러주세요.</div>
-    </main>
+    </div>
 
     <footer>
-        <div>
-            <a href="#" onclick="alert('서비스 이용약관 페이지 준비중')">이용약관</a> | 
-            <a href="#" onclick="alert('개인정보처리방침 페이지 준비중')">개인정보처리방침</a>
-        </div>
-        <div style="margin-top: 10px;">
-            문의: <a href="mailto:support@v-live-caption.com">support@v-live-caption.com</a>
-        </div>
-        <div style="margin-top: 10px; font-size: 0.75rem; opacity: 0.6;">
-            &copy; 2026 V-Live Caption. All rights reserved.
-        </div>
+        &copy; 2026 V-Live Caption | <a href="#" style="color:inherit;">문의하기</a>
     </footer>
 
     <script>
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
+        const aiBtn = document.getElementById('ai-btn');
         const finalTextSpan = document.getElementById('final-text');
         const interimTextSpan = document.getElementById('interim-text');
-        const statusBox = document.getElementById('status');
-        const captionContainer = document.getElementById('caption-container');
+        const aiBox = document.getElementById('ai-interpretation');
+        const statusBar = document.getElementById('status-bar');
+        const captionScroll = document.getElementById('caption-scroll');
 
-        // Web Speech API 초기화
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
 
         if (window.SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.interimResults = true;
-            recognition.lang = 'ko-KR';
-            recognition.continuous = true;
+            recognition = new RecognitionHelper();
+        } else {
+            statusBar.innerText = "이 브라우저는 음성 인식을 지원하지 않습니다.";
+            startBtn.disabled = true;
+        }
 
-            recognition.onstart = () => {
-                statusBox.innerHTML = '🟢 음성 인식 중... (말씀해 주세요)';
-                statusBox.className = 'status-box';
+        function RecognitionHelper() {
+            const rec = new SpeechRecognition();
+            rec.interimResults = true;
+            rec.lang = 'ko-KR';
+            rec.continuous = true;
+
+            rec.onstart = () => {
+                statusBar.innerText = "🟢 실시간 인식 중...";
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
             };
 
-            recognition.onend = () => {
-                statusBox.innerHTML = '⚪ 대기 중 (시작 버튼을 눌러주세요)';
+            rec.onend = () => {
+                statusBar.innerText = "⚪ 대기 중";
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
             };
 
-            recognition.onresult = (event) => {
-                let interimTranscript = '';
+            rec.onresult = (event) => {
+                let interim = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
                         finalTextSpan.innerText += event.results[i][0].transcript + ' ';
                     } else {
-                        interimTranscript += event.results[i][0].transcript;
+                        interim += event.results[i][0].transcript;
                     }
                 }
-                interimTextSpan.innerText = interimTranscript;
-                captionContainer.scrollTop = captionContainer.scrollHeight;
+                interimTextSpan.innerText = interim;
+                captionScroll.scrollTop = captionScroll.scrollHeight;
             };
 
-            // 상세한 에러 처리 (고객 지원 UX)
-            recognition.onerror = (event) => {
-                console.error('Recognition error:', event.error);
-                let errorMsg = '오류가 발생했습니다.';
-                
-                if (event.error === 'not-allowed') {
-                    errorMsg = '마이크 사용 권한이 거부되었습니다. 브라우저 설정에서 마이크를 허용해주세요.';
-                } else if (event.error === 'no-speech') {
-                    errorMsg = '일정 시간 동안 음성이 감지되지 않아 중지되었습니다.';
-                } else if (event.error === 'network') {
-                    errorMsg = '네트워크 연결이 불안정합니다. 인터넷 상태를 확인해주세요.';
-                }
-
-                statusBox.innerHTML = `⚠️ <span class="error-text">${errorMsg}</span>`;
-                startBtn.disabled = false;
-                stopBtn.disabled = true;
-            };
-
-        } else {
-            statusBox.innerHTML = '⚠️ <span class="error-text">이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 브라우저를 사용해주세요.</span>';
-            startBtn.disabled = true;
+            return rec;
         }
 
-        startBtn.onclick = () => {
-            if (!recognition) return;
-            // 시작할 때 이전 텍스트 초기화 여부는 기획에 따라 다름 (현재는 유지)
-            // finalTextSpan.innerText = ''; 
-            try {
-                recognition.start();
-            } catch (e) {
-                console.error(e);
-            }
-        };
+        startBtn.onclick = () => recognition.start();
+        stopBtn.onclick = () => recognition.stop();
 
-        stopBtn.onclick = () => {
-            if (recognition) recognition.stop();
+        // AI 해석 기능 (실제 API 호출 버전)
+        aiBtn.onclick = async () => {
+            const text = finalTextSpan.innerText;
+            if (!text || text.length < 5) {
+                alert("해석할 내용이 부족합니다. 좀 더 말씀해 주세요!");
+                return;
+            }
+
+            aiBox.innerText = "⏳ AI가 의도를 분석 중입니다...";
+            aiBtn.disabled = true;
+            
+            try {
+                // Cloudflare Functions API 호출
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const data = await response.json();
+                
+                if (data.result) {
+                    aiBox.innerHTML = `<strong>💡 AI 해석 결과:</strong>\n\n${data.result}`;
+                } else if (data.error) {
+                    aiBox.innerText = "❌ 오류: " + data.error;
+                }
+            } catch (err) {
+                console.error(err);
+                aiBox.innerText = "❌ AI 연결 실패. API 키 설정을 확인해주세요.";
+            } finally {
+                aiBtn.disabled = false;
+            }
         };
     </script>
 </body>
