@@ -141,6 +141,7 @@
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
         .btn-guide { background: #3498db; color: white; font-size: 0.9rem; }
+        .btn-diag { background: #777; color: white; font-size: 0.7rem; padding: 5px 10px; }
 
         .info-banner {
             background: rgba(52, 152, 219, 0.1);
@@ -152,24 +153,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .audio-meter {
-            width: 100%;
-            height: 15px;
-            background: #333;
-            border-radius: 7px;
-            margin-top: 10px;
-            overflow: hidden;
-            display: flex;
-            border: 1px solid #444;
-        }
-
-        .audio-meter-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4CAF50, #8BC34A, #FFEB3B);
-            transition: width 0.1s;
         }
 
         #guide-modal {
@@ -213,7 +196,7 @@
 
     <header>
         <h1 style="font-size: 1.4rem; margin:0;">🚀 V-Live Caption</h1>
-        <button class="btn" style="background:#333; border:1px solid #555; font-size:0.8rem;">내 계정</button>
+        <button class="btn btn-diag" onclick="runDiagnosis()">🔧 시스템 진단</button>
     </header>
 
     <nav>
@@ -224,37 +207,35 @@
     <div id="guide-modal">
         <div class="modal-content">
             <button class="close-btn" onclick="closeGuide()">×</button>
-            <h2>🎧 'audio-capture' 에러 완전 해결법</h2>
+            <h2>🎧 'Hz 맞추기'로 에러 완벽 해결하기</h2>
             
-            <div class="step" style="background: rgba(244, 67, 54, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid var(--danger);">
-                <strong>🚨 1단계: 윈도우 마이크 차단 해제 (필수)</strong>
-                <p>1. 윈도우 [설정] -> [개인정보] -> [마이크] 이동</p>
-                <p>2. <b>'마이크 액세스'</b> 및 <b>'데스크톱 앱 허용'</b>을 모두 <b>[켬]</b>으로 바꾸세요.</p>
+            <div class="step" style="background: rgba(255, 235, 59, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #FFEB3B;">
+                <strong>🚨 최후의 해결책: Hz(샘플링) 통일</strong>
+                <p>재생 장치와 녹음 장치의 속도가 다르면 에러가 납니다.</p>
+                <p>1. <b>[재생]</b> 탭 -> <b>[CABLE Input]</b> 속성 -> [고급] -> <span class="highlight">48000Hz (DVD 음질)</span> 선택</p>
+                <p>2. <b>[녹음]</b> 탭 -> <b>[CABLE Output]</b> 속성 -> [고급] -> <span class="highlight">48000Hz (DVD 음질)</span> 선택</p>
             </div>
 
             <div class="step" style="margin-top:20px;">
-                <strong>🛠️ 2단계: 장치 독점 모드 끄기</strong>
-                <p>다른 앱이 마이크를 독점하지 못하게 설정해야 합니다.</p>
-                <p>1. <b>[CABLE Output] 속성</b> -> <b>[고급]</b> 탭 이동</p>
-                <p>2. ❌ <b>'응용 프로그램에서 이 장치의 단독 모드 사용...'</b> 체크 <b>해제</b></p>
+                <strong>🛠️ 독점 모드 해제 (복습)</strong>
+                <p>위의 고급 탭에서 ❌ <b>'응용 프로그램에서 이 장치의 단독 모드 사용...'</b> 체크 해제하세요.</p>
             </div>
 
             <div class="step">
-                <strong>⚡ 3단계: 설정창 1초 만에 열기</strong>
+                <strong>⚡ 설정창 다시 열기</strong>
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <code style="background:#000; padding:8px 15px; border-radius:5px; flex:1; color:#0f0;">mmsys.cpl</code>
-                    <button class="btn-guide" onclick="copyCmd()">명령어 복사</button>
+                    <button class="btn-guide" onclick="copyCmd()">복사</button>
                 </div>
             </div>
 
-            <button class="btn btn-start" style="width:100%; justify-content:center;" onclick="closeGuide()">설정했습니다! 다시 시작할게요.</button>
+            <button class="btn btn-start" style="width:100%; justify-content:center;" onclick="closeGuide()">모두 맞췄습니다! 다시 시도</button>
         </div>
     </div>
 
-    <!-- 제품 1: 내 목소리 모드 -->
+    <!-- 제품 1: 내 목소리 -->
     <div id="mic-container" class="container active">
         <div class="info-banner" id="mic-info"><span>💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.</span></div>
-        <div class="audio-meter"><div id="mic-meter" class="audio-meter-fill"></div></div>
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">📝 실시간 기록 (내 목소리)</div>
@@ -275,13 +256,12 @@
         </div>
     </div>
 
-    <!-- 제품 2: 영상 자막 모드 -->
+    <!-- 제품 2: 영상 자막 -->
     <div id="youtube-container" class="container">
         <div class="info-banner" id="youtube-info">
-            <span>⚠️ <strong>에러 발생 시 가이드를 확인하세요.</strong></span>
-            <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>
+            <span>⚠️ <strong>Hz 설정이 틀리면 에러가 납니다.</strong></span>
+            <button class="btn btn-guide" onclick="openGuide()">🚨 Hz 설정법 보기</button>
         </div>
-        <div class="audio-meter"><div id="youtube-meter" class="audio-meter-fill"></div></div>
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
@@ -310,12 +290,9 @@
 
     <script>
         let recognition = null;
-        let audioContext = null;
-        let animationId = null;
-
         const ui = {
-            mic: { final: 'mic-final', interim: 'mic-interim', info: 'mic-info', meter: 'mic-meter', ai: 'mic-ai', scroll: 'mic-scroll', start: 'mic-start', stop: 'mic-stop' },
-            youtube: { final: 'youtube-final', interim: 'youtube-interim', info: 'youtube-info', meter: 'youtube-meter', ai: 'youtube-ai', scroll: 'youtube-scroll', start: 'youtube-start', stop: 'youtube-stop' }
+            mic: { final: 'mic-final', interim: 'mic-interim', info: 'mic-info', ai: 'mic-ai', scroll: 'mic-scroll', start: 'mic-start', stop: 'mic-stop' },
+            youtube: { final: 'youtube-final', interim: 'youtube-interim', info: 'youtube-info', ai: 'youtube-ai', scroll: 'youtube-scroll', start: 'youtube-start', stop: 'youtube-stop' }
         };
 
         function switchMode(mode) {
@@ -333,18 +310,23 @@
             alert('명령어가 복사되었습니다! [윈도우 로고 키 + R]을 누르고 붙여넣으세요.');
         }
 
-        // 마이크 충돌 방지를 위해 게이지를 별도로 분리하거나 끕니다.
-        async function startAudioMeter(mode) {
-            // 이번 버전에서는 충돌 방지를 위해 일단 게이지를 비활성화하고 자막에 집중합니다.
-            // 만약 게이지를 다시 켜고 싶다면 Web Speech API와 스트림을 공유해야 합니다.
+        async function runDiagnosis() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+                let msg = `🎤 감지된 마이크 (${mics.length}개):\n`;
+                mics.forEach(m => msg += `- ${m.label || '이름 없음'}\n`);
+                msg += `\n* 이름이 안 보이면 주소창 왼쪽 자물쇠를 눌러 마이크 권한을 허용하세요.`;
+                alert(msg);
+            } catch (err) {
+                alert("진단 실패: " + err.message);
+            }
         }
 
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         function startRec(mode) {
             if (!window.SpeechRecognition) return alert("브라우저 미지원");
-            
-            // 기존 인식이 있다면 중지
             if (recognition) recognition.stop();
 
             recognition = new SpeechRecognition();
@@ -359,17 +341,15 @@
             recognition.onstart = () => {
                 document.getElementById(ui[mode].start).disabled = true;
                 document.getElementById(ui[mode].stop).disabled = false;
-                infoBanner.innerHTML = "<span>🟢 <strong>실시간 인식 가동 중...</strong> 소리를 들려주세요.</span>";
+                infoBanner.innerHTML = "<span>🟢 <strong>인식 중...</strong> 소리가 안 들리면 48000Hz 설정을 확인하세요.</span>";
             };
 
             recognition.onerror = (event) => {
-                console.error("에러 발생:", event.error);
-                let msg = event.error;
+                console.error("에러:", event.error);
                 if (event.error === 'audio-capture') {
-                    msg = "마이크 연결 실패 (다른 앱에서 사용 중일 수 있음)";
                     openGuide();
                 }
-                infoBanner.innerHTML = `<span>❌ <strong>에러 발생:</strong> ${msg}</span> <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>`;
+                infoBanner.innerHTML = `<span>❌ <strong>에러:</strong> ${event.error}</span> <button class="btn btn-guide" onclick="openGuide()">🚨 Hz 설정법 보기</button>`;
             };
 
             recognition.onend = () => {
@@ -388,19 +368,14 @@
                 scrollArea.scrollTop = scrollArea.scrollHeight;
                 if (mode === 'youtube') updatePip(interim || finalSpan.innerText.split(' ').slice(-5).join(' '));
             };
-
-            try {
-                recognition.start();
-            } catch (e) {
-                console.error("인식 시작 실패:", e);
-            }
+            recognition.start();
         }
 
         function stopRec(mode) { if (recognition) recognition.stop(); }
 
         async function callAI(mode) {
             const text = document.getElementById(ui[mode].final).innerText;
-            if (!text || text.length < 5) return alert("데이터가 부족합니다.");
+            if (!text || text.length < 5) return alert("데이터 부족");
             const aiBox = document.getElementById(ui[mode].ai);
             aiBox.innerText = "⏳ AI 분석 중...";
             try {
@@ -411,7 +386,7 @@
                 });
                 const data = await res.json();
                 aiBox.innerHTML = `<strong>💡 AI 결과:</strong>\n\n${data.result || data.error}`;
-            } catch (err) { aiBox.innerText = "❌ 연결 실패"; }
+            } catch (err) { aiBox.innerText = "❌ 실패"; }
         }
 
         const canvas = document.getElementById('pip-canvas');
