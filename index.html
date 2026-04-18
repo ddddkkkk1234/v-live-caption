@@ -347,7 +347,7 @@
             pipCtx.fillStyle = document.getElementById('text-color-picker').value;
             const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
             pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
-            const fullText = (document.getElementById('youtube-text').innerText + " " + document.getElementById('interim-text').innerText).trim();
+            const fullText = (document.getElementById('youtube-text').innerText).trim();
             const words = fullText.split(' ').slice(-8).join(' ');
             pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
         }
@@ -387,12 +387,19 @@
             document.getElementById('model-loading').style.display = 'block';
             try {
                 if (!whisperInstance) {
+                    // WebGPU 시도 (지원되는 브라우저에서 성능 향상)
                     whisperInstance = await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                        device: 'webgpu', 
                         progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
+                    }).catch(async () => {
+                        log("[안내] WebGPU 미지원. CPU 모드로 전환합니다.");
+                        return await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                            progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
+                        });
                     });
                 }
                 document.getElementById('model-loading').style.display = 'none';
-                log("[로컬 AI] 준비 완료. 마이크 감지 중...");
+                log("[로컬 AI] 가동 완료. (3초마다 분석)");
 
                 proInterval = setInterval(async () => {
                     if (!isProRunning) return;
@@ -416,8 +423,9 @@
                         await internalAudioCtx.close();
                     };
                     recorder.start();
-                    setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 4000);
-                }, 4500);
+                    // 3초 단위로 짧게 분석하여 고정밀 모드와 속도 맞춤
+                    setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
+                }, 3500);
             } catch (e) { log("로컬 에러: " + e.message, true); }
         }
 
@@ -474,8 +482,9 @@
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, question }) });
                 const data = await res.json();
-                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${data.result}</div>`;
-                else aiArea.innerHTML = data.result;
+                const result = data.result || "결과 오류";
+                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${result}</div>`;
+                else aiArea.innerHTML = result;
                 aiArea.scrollTop = aiArea.scrollHeight;
             } catch (e) { log("AI 오류", true); }
         }
