@@ -179,33 +179,33 @@
             </div>
         </div>
         <div class="volume-meter">
-            <span style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도</span>
+            <span style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도 (Gain)</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
             <span id="v-label" style="font-size: 0.65rem; font-weight:800; min-width:25px;">0%</span>
         </div>
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('youtube')">실시간 세션</div>
-        <div class="nav-item" onclick="switchMode('mic')">기록 아카이브</div>
+        <div class="nav-item active" onclick="switchMode('youtube')">실시간 세션 (Live)</div>
+        <div class="nav-item" onclick="switchMode('mic')">기록 아카이브 (History)</div>
     </nav>
 
     <div id="youtube-container" class="container active">
         <!-- 설정 영역 -->
         <div class="selector-box">
             <div class="selector-item">
-                <label>입력 장치 선택</label>
+                <label>입력 장치 선택 (Input)</label>
                 <select id="device-select" onchange="initAudio()"><option value="">장치 감지 중...</option></select>
             </div>
             <div class="selector-item">
-                <label>자막 엔진 선택</label>
+                <label>자막 모드 선택 (Mode)</label>
                 <select id="engine-select">
-                    <option value="web-speech">기본 로컬 엔진 (무제한/무료)</option>
-                    <option value="groq">Groq Whisper (고정밀/Pro)</option>
+                    <option value="web-speech">일반 자막 모드 (Standard)</option>
+                    <option value="groq">고정밀 AI 모드 (Premium)</option>
                 </select>
             </div>
             <div class="selector-item">
-                <label>인식 언어 설정</label>
+                <label>인식 언어 설정 (Lang)</label>
                 <select id="lang-select">
                     <option value="ko-KR">한국어 (Korean)</option>
                     <option value="en-US">영어 (English)</option>
@@ -213,11 +213,11 @@
                 </select>
             </div>
             <div class="selector-item">
-                <label>자막 글자 크기</label>
+                <label>자막 글자 크기 (Size)</label>
                 <input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()">
             </div>
             <div class="selector-item">
-                <label>자막 글자 색상</label>
+                <label>자막 글자 색상 (Color)</label>
                 <input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()">
             </div>
         </div>
@@ -225,7 +225,7 @@
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
-                    <h3><span>📺</span> 실시간 자막 피드</h3>
+                    <h3><span>📺</span> 실시간 자막 피드 (Transcript)</h3>
                     <div style="display:flex; gap:8px;">
                         <button onclick="clearTranscript()" class="btn btn-pip">기록 삭제</button>
                         <button onclick="togglePIP()" class="btn btn-pip">PIP 모드 켜기</button>
@@ -236,15 +236,15 @@
                 </div>
             </div>
             <div class="card" style="border-color: rgba(124, 77, 255, 0.3);">
-                <div class="card-header"><h3><span>🧠</span> AI 실시간 분석</h3></div>
+                <div class="card-header"><h3><span>🧠</span> AI 실시간 분석 (AI Intel)</h3></div>
                 <div class="scroll-area" id="youtube-ai"></div>
             </div>
         </div>
 
         <div class="controls">
-            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작</button>
-            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료</button>
-            <button onclick="callAI()" class="btn btn-ai">✨ AI 실시간 요약</button>
+            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작 (Start)</button>
+            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료 (Stop)</button>
+            <button onclick="callAI()" class="btn btn-ai">✨ AI 실시간 요약 (Summarize)</button>
             <button onclick="downloadTranscript()" class="btn btn-download">📥 자막 다운로드 (.txt)</button>
         </div>
 
@@ -344,7 +344,7 @@
                 const constraints = { 
                     audio: { 
                         deviceId: deviceId ? { exact: deviceId } : undefined, 
-                        autoGainControl: false,
+                        autoGainControl: false, // 감도 안정을 위해 수동 제어
                         echoCancellation: false,
                         noiseSuppression: false
                     } 
@@ -370,7 +370,8 @@
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 4.5); 
+                    // 감도 보정 (실시간 피드백 강화)
+                    let avg = Math.round((sum / data.length) * 4.8); 
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
                     updatePipCanvas();
@@ -421,7 +422,7 @@
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
             setStatus("자막 캡처 중", true);
-            log(`STT 엔진 [${engine}] 가동 시작.`);
+            log(`STT 엔진 가동 시작.`);
             if (engine === 'web-speech') startWebSpeech(lang);
             else startGroqWhisper(lang);
         }
@@ -498,7 +499,7 @@
         async function callAI() {
             const text = document.getElementById('youtube-text').innerText;
             if (text.length < 10) return log("분석할 자막 데이터가 충분하지 않습니다.", true);
-            log("AI가 실시간 요약 분석을 시작합니다...");
+            log("AI가 실시간 분석을 시작합니다...");
             setStatus("AI 분석 중", true);
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
