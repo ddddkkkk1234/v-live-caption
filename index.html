@@ -56,7 +56,7 @@
         .v-fill {
             height: 100%;
             width: 0%;
-            background: var(--primary);
+            background: linear-gradient(90deg, #4CAF50, #FFEB3B);
             transition: width 0.1s;
         }
 
@@ -175,7 +175,7 @@
     <header>
         <h1 style="font-size: 1.2rem; margin:0;">🚀 V-Live Caption</h1>
         <div class="volume-meter">
-            <span style="font-size: 0.7rem;">MIC 감도:</span>
+            <span style="font-size: 0.7rem;">입력 감도:</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
             <span id="v-label" style="font-size: 0.7rem; min-width: 25px;">0%</span>
         </div>
@@ -188,7 +188,7 @@
 
     <div id="youtube-container" class="container">
         <div class="info-banner" id="y-info">
-            ✨ <strong>Pro 모드 가동 중:</strong> 자막이 안 나오면 위 'MIC 감도'가 움직이는지 확인하세요!
+            ✨ <strong>Pro 모드:</strong> 소리를 크게 키우세요! 자막이 안 나오면 위 '입력 감도'를 확인하세요.
         </div>
         <div id="pro-error"></div>
         <div class="content-grid">
@@ -232,22 +232,31 @@
         let proInterval = null;
         let isProRunning = false;
         let audioContext = null;
+        let gainNode = null; // 소리 증폭 노드
 
-        // 볼륨 미터 가동
-        async function initVolume() {
+        // 볼륨 미터 및 증폭 가동
+        async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
+                
+                // [추가] 소리 2배 증폭기 설정
+                gainNode = audioContext.createGain();
+                gainNode.gain.value = 3.0; // 3배 증폭 (작은 소리도 잘 들리게)
+                
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 256;
-                source.connect(analyser);
+                
+                source.connect(gainNode); // 소리 입력 -> 증폭기
+                gainNode.connect(analyser); // 증폭기 -> 분석기
+                
                 const data = new Uint8Array(analyser.frequencyBinCount);
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0;
                     for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 2);
+                    let avg = Math.round((sum / data.length) * 2.5); // 게이지 감도 증가
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
                     requestAnimationFrame(draw);
@@ -255,7 +264,7 @@
                 draw();
             } catch(e) { console.error(e); }
         }
-        initVolume();
+        initAudio();
 
         function switchMode(mode) {
             document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
@@ -284,7 +293,7 @@
         }
         function stopRec() { if(recognition) recognition.stop(); document.querySelectorAll('.btn-start').forEach(b => b.disabled = false); document.querySelectorAll('.btn-stop').forEach(b => b.disabled = true); }
 
-        // Pro 모드
+        // Pro 모드 (3초 녹음 -> 서버 전송)
         async function startProRec() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -292,9 +301,12 @@
                 document.getElementById('pro-start').disabled = true;
                 document.getElementById('pro-stop').disabled = false;
                 document.getElementById('pro-error').style.display = 'none';
+                document.getElementById('y-info').innerHTML = "🟢 <strong>실시간 분석 중...</strong> 소리가 20% 이상은 나와야 자막이 잘 뜹니다.";
 
                 proInterval = setInterval(async () => {
                     if (!isProRunning) return;
+                    
+                    // MediaRecorder를 사용하여 증폭된 스트림은 어렵지만 기본 스트림으로 전송
                     const recorder = new MediaRecorder(stream);
                     const chunks = [];
                     recorder.ondataavailable = e => chunks.push(e.data);
@@ -307,13 +319,13 @@
                         try {
                             const res = await fetch('/api/stt', { method: 'POST', body: formData });
                             const data = await res.json();
-                            if (data.text) {
+                            if (data.text && data.text.trim().length > 1) {
                                 document.getElementById('youtube-text').innerHTML += data.text + " ";
                                 document.getElementById('youtube-scroll').scrollTop = 99999;
                             }
                         } catch (e) { 
                             document.getElementById('pro-error').style.display = 'block';
-                            document.getElementById('pro-error').innerText = "⚠️ 서버 통신 실패 (API 키 확인 필요)";
+                            document.getElementById('pro-error').innerText = "⚠️ 자막 전송 실패 (네트워크나 API 키를 확인하세요)";
                         }
                     };
                     recorder.start();
@@ -321,13 +333,13 @@
                 }, 3500);
             } catch (err) { alert("마이크 권한을 허용해주세요!"); }
         }
-        function stopProRec() { isProRunning = false; clearInterval(proInterval); document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true; }
+        function stopProRec() { isProRunning = false; clearInterval(proInterval); document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true; document.getElementById('y-info').innerText = "⚪ 중지됨"; }
 
         async function callAI(mode) {
             const text = mode === 'mic' ? document.getElementById('mic-final').innerText : document.getElementById('youtube-text').innerText;
             if (text.length < 5) return alert("자막이 부족합니다.");
             const aiBox = document.getElementById(mode + '-ai');
-            aiBox.innerText = "⏳ 분석 중...";
+            aiBox.innerText = "⏳ 요약 중...";
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
                 const data = await res.json();
