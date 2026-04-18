@@ -131,7 +131,6 @@
         #youtube-text { font-size: var(--caption-size); color: var(--caption-color); opacity: var(--caption-opacity); font-weight: 700; transition: all 0.2s; }
         .interim { color: var(--text-muted); font-style: italic; }
 
-        /* 채팅 스타일 UI */
         .chat-container { display: flex; flex-direction: column; height: 100%; }
         #youtube-ai { flex: 1; font-size: 0.95rem; color: #D1D1D6; line-height: 1.7; padding-bottom: 10px; }
         .chat-input-box { display: flex; gap: 8px; padding: 12px; background: var(--surface-light); border-top: 1px solid var(--border); }
@@ -166,7 +165,7 @@
             <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
         </div>
         <div class="volume-meter">
-            <span style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도</span>
+            <span id="v-title" style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
             <span id="v-label" style="font-size: 0.65rem; font-weight:800; min-width:25px;">0%</span>
         </div>
@@ -256,10 +255,11 @@
             if (engine === 'web-speech') {
                 deviceSelect.disabled = true;
                 deviceHint.style.display = 'block';
-                initAudio(true); 
+                log("[안내] 일반 모드는 브라우저 설정의 '기본 마이크'만 사용합니다.");
             } else {
                 deviceSelect.disabled = false;
                 deviceHint.style.display = 'none';
+                initAudio(); // 장치 선택 가능하도록 오디오 재연결
             }
         }
 
@@ -323,39 +323,47 @@
             return cleaned;
         }
 
-        async function initAudio(useDefault = false) {
+        async function initAudio() {
             try {
-                if (audioContext) audioContext.close();
-                let deviceId = document.getElementById('device-select').value;
-                if (useDefault) deviceId = undefined; 
+                if (audioContext) {
+                    if(audioContext.state !== 'closed') await audioContext.close();
+                }
+                const deviceId = document.getElementById('device-select').value;
                 const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } };
+                
+                // 기존 스트림 정리
+                if(stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
-                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === (useDefault ? mics[0]?.deviceId : currentVal) ? 'selected' : ''}>${m.label || '기본 마이크'}</option>`).join('');
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '기본 마이크'}</option>`).join('');
+                
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioContext.state === 'suspended') await audioContext.resume();
                 const source = audioContext.createMediaStreamSource(stream);
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 512;
                 source.connect(analyser);
                 const data = new Uint8Array(analyser.frequencyBinCount);
+                
                 function draw() {
+                    if(!audioContext || audioContext.state === 'closed') return;
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
                     let avg = Math.round((sum / data.length) * 4.8); 
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
                     updatePipCanvas();
-                    if(audioContext.state !== 'closed') requestAnimationFrame(draw);
+                    requestAnimationFrame(draw);
                 }
                 draw();
                 setStatus("준비 완료", false);
             } catch(e) { log("마이크 연결 실패: " + e.message, true); }
         }
-        initAudio();
 
         function updatePipCanvas() {
             pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
@@ -382,13 +390,33 @@
         }
 
         async function startProRec() {
-            if (!stream) await initAudio();
+            const engine = document.getElementById('engine-select').value;
+            const lang = document.getElementById('lang-select').value;
+            
             isProRunning = true;
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
+            
+            if (engine === 'web-speech') {
+                // 일반 모드: 기존 마이크 스트림을 종료하여 브라우저 엔진에 양보
+                if(stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                if(audioContext) {
+                    await audioContext.close();
+                    audioContext = null;
+                }
+                document.getElementById('v-title').innerText = "엔진 점유 중";
+                document.getElementById('v-fill').style.width = "100%";
+                startWebSpeech(lang);
+            } else {
+                // 고정밀 모드: 마이크 스트림 필요
+                document.getElementById('v-title').innerText = "마이크 감도";
+                if (!stream) await initAudio();
+                startGroqWhisper(lang);
+            }
             setStatus("캡처 중", true);
-            if (document.getElementById('engine-select').value === 'web-speech') startWebSpeech(document.getElementById('lang-select').value);
-            else startGroqWhisper(document.getElementById('lang-select').value);
         }
 
         function startWebSpeech(lang) {
@@ -414,11 +442,15 @@
                     }
                 }
             };
-            recognition.onend = () => { if (isProRunning) { setTimeout(() => { try { recognition.start(); } catch(e){} }, 1000); } };
-            try { recognition.start(); } catch(e) {}
+            recognition.onend = () => { if (isProRunning) { setTimeout(() => { try { recognition.start(); } catch(e){} }, 500); } };
+            recognition.onerror = (e) => {
+                if(e.error !== 'no-speech') log(`[에러] ${e.error}`, true);
+            };
+            try { recognition.start(); log("[일반 모드] 엔진 가동 성공"); } catch(e) { log("엔진 가동 실패", true); }
         }
 
         function startGroqWhisper(lang) {
+            log("[Premium] 고정밀 엔진 가동");
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
                 const recorder = new MediaRecorder(stream);
@@ -455,6 +487,8 @@
             if (recognition) { recognition.onend = null; try { recognition.stop(); } catch(e) {} }
             document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true;
             document.getElementById('interim-text').innerText = ""; setStatus("IDLE", false);
+            document.getElementById('v-title').innerText = "마이크 감도";
+            initAudio(); // 미터기 복구
         }
 
         async function callAI(question = null) {
@@ -462,7 +496,7 @@
             if (text.length < 10) return log("데이터 부족", true);
             const aiArea = document.getElementById('youtube-ai');
             if (question) {
-                aiArea.innerHTML += `<div style="margin-top:10px; color:var(--primary);">Q: ${question}</div>`;
+                aiArea.innerHTML += `<div style="margin-top:10px; color:var(--primary); font-weight:bold;">Q: ${question}</div>`;
                 document.getElementById('chat-input').value = "";
             } else {
                 aiArea.innerHTML = "분석 중...";
@@ -470,7 +504,7 @@
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, question }) });
                 const data = await res.json();
-                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px;">A: ${data.result}</div>`;
+                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${data.result}</div>`;
                 else aiArea.innerHTML = data.result;
                 aiArea.scrollTop = aiArea.scrollHeight;
             } catch (e) { log("AI 오류", true); }
