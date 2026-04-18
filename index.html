@@ -202,20 +202,21 @@
                     formData.append('language', 'ko');
                     
                     log(`📤 서버로 전송 중 (${Math.round(blob.size/1024)}KB)...`);
-                    try {
-                        const res = await fetch('/api/stt', { method: 'POST', body: formData });
-                        const data = await res.json();
-                        
-                        if (res.ok && data.text) {
-                            log(`📥 수신 완료: "${data.text.substring(0, 15)}..."`);
-                            document.getElementById('youtube-text').innerHTML += data.text + " ";
-                            document.getElementById('youtube-scroll').scrollTop = 99999;
-                        } else if (data.error) {
-                            log(`❌ 서버 에러: ${data.error}`, true);
-                        } else {
-                            log(`❌ 서버 응답이 비어있음 (코드: ${res.status})`, true);
-                        }
-                    } catch (e) { log("❌ 전송 실패 (네트워크 확인)", true); }
+                        try {
+                            const res = await fetch('/api/stt', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            
+                            if (res.ok && data.text && data.text.trim()) {
+                                log(`📥 수신: "${data.text.substring(0, 20)}..."`);
+                                document.getElementById('youtube-text').innerHTML += data.text + " ";
+                                document.getElementById('youtube-scroll').scrollTop = 99999;
+                            } else if (data.error) {
+                                log(`❌ AI 에러: ${data.error}`, true);
+                            } else {
+                                // 만약 텍스트가 정말로 비어있다면 (무음 등)
+                                log(`⚪ 음성 인식 결과 없음 (조용한 상태)`);
+                            }
+                        } catch (e) { log("❌ 네트워크 통신 실패", true); }
                 };
                 recorder.start();
                 setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
