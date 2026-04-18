@@ -68,7 +68,7 @@
             margin: 0 auto;
             width: 100%;
             box-sizing: border-box;
-            gap: 1.5rem;
+            gap: 1rem;
         }
 
         .container.active { display: flex; }
@@ -140,38 +140,73 @@
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
+        .btn-guide { background: #3498db; color: white; font-size: 0.8rem; }
 
         .info-banner {
             background: rgba(52, 152, 219, 0.1);
             border-left: 4px solid #3498db;
             padding: 1rem;
             border-radius: 8px;
-            font-size: 0.9rem;
+            font-size: 1rem;
             line-height: 1.5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* 소리 감지 게이지 스타일 */
         .audio-meter {
             width: 100%;
-            height: 10px;
+            height: 12px;
             background: #333;
-            border-radius: 5px;
+            border-radius: 6px;
             margin-top: 10px;
             overflow: hidden;
             display: flex;
+            border: 1px solid #444;
         }
 
         .audio-meter-fill {
             height: 100%;
             width: 0%;
-            background: var(--primary);
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
             transition: width 0.1s;
         }
 
-        footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+        /* 가이드 모달 */
+        #guide-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
 
-        #pip-canvas { display: none; }
-        #pip-video { display: none; }
+        .modal-content {
+            background: #252525;
+            padding: 2rem;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 2px solid var(--primary);
+            position: relative;
+        }
+
+        .modal-content h2 { color: var(--primary); margin-top: 0; }
+        .step { margin-bottom: 20px; padding-left: 20px; border-left: 2px solid #555; }
+        .step strong { color: #fff; font-size: 1.1rem; }
+        .step p { color: #ccc; margin: 5px 0; }
+        .close-btn { 
+            position: absolute; top: 15px; right: 15px; 
+            background: #444; color: #fff; border: none; 
+            width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+        }
+
+        footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -186,10 +221,42 @@
         <div class="nav-item" onclick="switchMode('youtube')">2. 📺 영상 소리 실시간 자막</div>
     </nav>
 
+    <!-- 가이드 모달 -->
+    <div id="guide-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeGuide()">×</button>
+            <h2>🎧 보청기/에어팟 자막 설정법</h2>
+            
+            <div class="step" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary);">
+                <strong>⚡ 설정창 1초 만에 여는 법</strong>
+                <p>1. 키보드의 <b>[윈도우 로고 키 + R]</b>을 누르세요.</p>
+                <p>2. 아래 명령어를 복사해서 붙여넣고 엔터!</p>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <code style="background:#000; padding:8px 15px; border-radius:5px; flex:1; color:#0f0;">mmsys.cpl</code>
+                    <button class="btn-guide" onclick="copyCmd()">명령어 복사</button>
+                </div>
+            </div>
+
+            <div class="step" style="margin-top:20px;">
+                <strong>1단계: 스테레오 믹스 켜기</strong>
+                <p>[녹음] 탭에서 빈 곳 우클릭 -> [사용할 수 없는 장치 표시] 체크 -> [스테레오 믹스] 우클릭 후 <b>[사용]</b> 클릭</p>
+            </div>
+
+            <div class="step">
+                <strong>2단계: 보청기로 소리 보내기 (중요!)</strong>
+                <p>[스테레오 믹스] 우클릭 -> [속성] -> [수신 대기] 탭 이동</p>
+                <p>✅ <b>[이 장치로 듣기]</b> 체크</p>
+                <p>✅ [이 장치로 재생]에서 <b>사용자님의 보청기(또는 에어팟)</b> 선택</p>
+            </div>
+
+            <button class="btn btn-start" style="width:100%; justify-content:center;" onclick="closeGuide()">설정 완료했습니다!</button>
+        </div>
+    </div>
+
     <!-- 제품 1: 내 목소리 모드 -->
     <div id="mic-container" class="container active">
         <div class="info-banner" id="mic-info">
-            💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.
+            <span>💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.</span>
         </div>
         <div class="audio-meter"><div id="mic-meter" class="audio-meter-fill"></div></div>
         
@@ -217,7 +284,8 @@
     <!-- 제품 2: 영상 자막 모드 -->
     <div id="youtube-container" class="container">
         <div class="info-banner" id="youtube-info">
-            🎧 <strong>에어팟 필수 셋팅:</strong> [스테레오 믹스 속성] -> [수신 대기] -> <strong>[이 장치로 듣기] 체크</strong> -> 재생 장치를 <strong>[에어팟]</strong>으로 설정하세요!
+            <span>⚠️ <strong>보청기/에어팟 사용 시 설정이 필요합니다.</strong></span>
+            <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>
         </div>
         <div class="audio-meter"><div id="youtube-meter" class="audio-meter-fill"></div></div>
 
@@ -245,8 +313,8 @@
         </div>
     </div>
 
-    <canvas id="pip-canvas" width="600" height="200"></canvas>
-    <video id="pip-video" autoplay muted playsinline></video>
+    <canvas id="pip-canvas" width="600" height="200" style="display:none;"></canvas>
+    <video id="pip-video" autoplay muted playsinline style="display:none;"></video>
 
     <script>
         let recognition = null;
@@ -265,6 +333,13 @@
             document.getElementById(mode + '-container').classList.add('active');
             event.currentTarget.classList.add('active');
             if(recognition) stopRec(mode === 'mic' ? 'youtube' : 'mic');
+        }
+
+        function openGuide() { document.getElementById('guide-modal').style.display = 'flex'; }
+        function closeGuide() { document.getElementById('guide-modal').style.display = 'none'; }
+        function copyCmd() {
+            navigator.clipboard.writeText('mmsys.cpl');
+            alert('명령어가 복사되었습니다! [윈도우 로고 키 + R]을 누르고 붙여넣으세요.');
         }
 
         async function startAudioMeter(mode) {
@@ -288,9 +363,7 @@
                     animationId = requestAnimationFrame(updateMeter);
                 }
                 updateMeter();
-            } catch (err) {
-                console.error("오디오 미터 에러:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -309,12 +382,13 @@
             recognition.onstart = () => {
                 document.getElementById(ui[mode].start).disabled = true;
                 document.getElementById(ui[mode].stop).disabled = false;
-                infoBanner.innerHTML = "🟢 <strong>소리 감시 중...</strong> 에어팟으로 소리가 들리나요?";
+                infoBanner.innerHTML = "<span>🟢 <strong>소리 감지 중...</strong> 자막이 안 나오면 가이드를 확인하세요.</span>";
                 startAudioMeter(mode);
             };
 
             recognition.onerror = (event) => {
-                infoBanner.innerHTML = "❌ <strong>에러:</strong> " + event.error;
+                infoBanner.innerHTML = `<span>❌ <strong>에러 발생:</strong> ${event.error}</span> <button class="btn btn-guide" onclick="openGuide()">🚨 해결 방법 보기</button>`;
+                openGuide();
             };
 
             recognition.onend = () => {
@@ -367,7 +441,6 @@
             try { video.srcObject = canvas.captureStream(); await video.play(); await video.requestPictureInPicture(); }
             catch (err) { alert("PIP 오류"); }
         }
-        updatePip("준비 완료");
     </script>
 </body>
 </html>
