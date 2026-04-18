@@ -45,184 +45,94 @@
             border: 1px solid #333;
         }
 
-        .v-bar {
-            width: 80px;
-            height: 8px;
-            background: #222;
-            border-radius: 4px;
-            overflow: hidden;
-        }
+        .v-bar { width: 80px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+        .v-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.1s; }
 
-        .v-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4CAF50, #FFEB3B);
-            transition: width 0.1s;
-        }
+        nav { display: flex; background-color: var(--nav-bg); padding: 0 5%; gap: 10px; }
+        .nav-item { padding: 1.2rem 1rem; cursor: pointer; font-weight: bold; color: var(--text-muted); border-bottom: 4px solid transparent; transition: all 0.2s; }
+        .nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-        nav {
-            display: flex;
-            background-color: var(--nav-bg);
-            padding: 0 5%;
-            gap: 10px;
-        }
-
-        .nav-item {
-            padding: 1.2rem 1rem;
-            cursor: pointer;
-            font-weight: bold;
-            color: var(--text-muted);
-            border-bottom: 4px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .nav-item.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .container {
-            flex: 1;
-            display: none;
-            flex-direction: column;
-            padding: 1rem;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-            box-sizing: border-box;
-            gap: 1rem;
-        }
-
+        .container { flex: 1; display: none; flex-direction: column; padding: 1rem; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; gap: 1rem; }
         .container.active { display: flex; }
 
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            flex: 1;
-        }
+        .card { background: var(--surface); border-radius: 16px; border: 1px solid #333; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; }
+        .card-header { padding: 1rem 1.2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid #333; font-weight: bold; display: flex; justify-content: space-between; }
 
-        @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
-
-        .card {
-            background: var(--surface);
-            border-radius: 16px;
-            border: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .card-header {
-            padding: 1rem 1.2rem;
-            background: rgba(255,255,255,0.05);
-            border-bottom: 1px solid #333;
-            font-weight: bold;
-        }
-
-        .scroll-area {
-            flex: 1;
-            padding: 1.2rem;
-            overflow-y: auto;
-            height: 40vh;
-            line-height: 1.8;
-            font-size: 1.3rem;
-        }
-
-        .controls {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            padding: 1rem 0;
-        }
-
-        .btn {
-            padding: 0.8rem 1.5rem;
-            border-radius: 10px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
+        .scroll-area { flex: 1; padding: 1.2rem; overflow-y: auto; height: 40vh; line-height: 1.8; font-size: 1.3rem; }
+        
+        .controls { display: flex; gap: 12px; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
+        .btn { padding: 0.8rem 1.5rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: all 0.2s; }
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
 
-        .info-banner {
-            background: rgba(52, 152, 219, 0.1);
-            border-left: 4px solid #3498db;
-            padding: 1rem;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
+        /* 장치 선택기 */
+        .selector-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #444; }
+        select { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 6px; width: 100%; margin-top: 10px; font-family: inherit; }
 
-        #pro-error {
-            background: rgba(244, 67, 54, 0.1);
-            color: var(--danger);
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 8px;
-            display: none;
-            font-size: 0.8rem;
-        }
+        /* 디버그 로그 창 */
+        #debug-log { background: #000; color: #0f0; font-family: monospace; font-size: 0.7rem; padding: 10px; height: 80px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; margin-top: 10px; }
 
-        footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+        footer { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1 style="font-size: 1.2rem; margin:0;">🚀 V-Live Caption</h1>
+        <h1 style="font-size: 1.2rem; margin:0;">🚀 V-Live Caption Pro</h1>
         <div class="volume-meter">
-            <span style="font-size: 0.7rem;">입력 감도:</span>
+            <span style="font-size: 0.7rem;">감도:</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
-            <span id="v-label" style="font-size: 0.7rem; min-width: 25px;">0%</span>
+            <span id="v-label" style="font-size: 0.7rem;">0%</span>
         </div>
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('mic')">🎙️ 1. 내 목소리</div>
-        <div class="nav-item" onclick="switchMode('youtube')">📺 2. 고정밀 자막(Pro)</div>
+        <div class="nav-item active" onclick="switchMode('youtube')">📺 2. 고정밀 자막(Pro)</div>
+        <div class="nav-item" onclick="switchMode('mic')">🎙️ 1. 일반 기록</div>
     </nav>
 
-    <div id="youtube-container" class="container">
-        <div class="info-banner" id="y-info">
-            ✨ <strong>Pro 모드:</strong> 소리를 크게 키우세요! 자막이 안 나오면 위 '입력 감도'를 확인하세요.
+    <!-- Pro 모드 (메인) -->
+    <div id="youtube-container" class="container active">
+        <div class="selector-box">
+            <strong>🎤 1단계: 장치 선택 (필수!)</strong>
+            <select id="device-select" onchange="initAudio()">
+                <option value="">마이크 목록을 불러오는 중...</option>
+            </select>
+            <p style="font-size:0.75rem; color:#888; margin:8px 0 0 0;">반드시 <b>CABLE Output</b>을 선택해야 유튜브 소리가 들어옵니다.</p>
         </div>
-        <div id="pro-error"></div>
+
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">📺 고정밀 실시간 자막</div>
+                <div class="card-header">📺 실시간 AI 자막</div>
                 <div id="youtube-scroll" class="scroll-area" style="background:#000;">
                     <div id="youtube-text" style="color:#FFEB3B; font-weight:bold;"></div>
                 </div>
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header" style="color: #d1b3ff;">🧠 AI 요약</div>
+                <div class="card-header">🧠 AI 요약</div>
                 <div id="youtube-ai" class="scroll-area" style="font-size: 1rem;"></div>
             </div>
         </div>
+
         <div class="controls">
             <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 시작</button>
             <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 중지</button>
             <button onclick="callAI('youtube')" class="btn btn-ai">✨ 요약하기</button>
         </div>
+
+        <div id="debug-log">시스템 준비 완료...</div>
     </div>
 
-    <div id="mic-container" class="container active">
-        <div class="info-banner">🎙️ 일반 내 목소리 기록 모드입니다.</div>
+    <!-- 일반 모드 -->
+    <div id="mic-container" class="container">
+        <div class="info-banner">일반 내 목소리 기록 모드입니다.</div>
         <div class="content-grid">
-            <div class="card">
-                <div class="card-header">📝 기록</div>
-                <div id="mic-scroll" class="scroll-area">
-                    <span id="mic-final"></span><span id="mic-interim" style="color:gray;"></span>
-                </div>
-            </div>
-            <div class="card"><div class="card-header">🧠 AI 해석</div><div id="mic-ai" class="scroll-area" style="font-size: 1rem;"></div></div>
+            <div class="card"><div class="card-header">📝 기록</div><div id="mic-scroll" class="scroll-area"><span id="mic-final"></span></div></div>
+            <div class="card"><div class="card-header">🧠 해석</div><div id="mic-ai" class="scroll-area"></div></div>
         </div>
         <div class="controls">
-            <button onclick="startRec('mic')" id="mic-start" class="btn btn-start">🎙️ 시작</button>
+            <button onclick="startRec()" id="mic-start" class="btn btn-start">🎙️ 시작</button>
             <button onclick="stopRec()" id="mic-stop" class="btn btn-stop" disabled>■ 중지</button>
         </div>
     </div>
@@ -232,37 +142,48 @@
         let proInterval = null;
         let isProRunning = false;
         let audioContext = null;
-        let gainNode = null; // 소리 증폭 노드
+        let stream = null;
 
-        // 볼륨 미터 및 증폭 가동
+        const log = (msg) => {
+            const box = document.getElementById('debug-log');
+            box.innerHTML += `> ${msg}<br>`;
+            box.scrollTop = box.scrollHeight;
+        };
+
+        // 장치 목록 가져오기 및 오디오 초기화
         async function initAudio() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (audioContext) audioContext.close();
+                const deviceId = document.getElementById('device-select').value;
+                
+                const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // 장치 목록 업데이트 (최초 1회 및 권한 획득 후)
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+                const select = document.getElementById('device-select');
+                const currentVal = select.value;
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '알 수 없는 마이크'}</option>`).join('');
+
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
-                
-                // [추가] 소리 2배 증폭기 설정
-                gainNode = audioContext.createGain();
-                gainNode.gain.value = 3.0; // 3배 증폭 (작은 소리도 잘 들리게)
-                
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 256;
-                
-                source.connect(gainNode); // 소리 입력 -> 증폭기
-                gainNode.connect(analyser); // 증폭기 -> 분석기
-                
+                source.connect(analyser);
                 const data = new Uint8Array(analyser.frequencyBinCount);
+                
                 function draw() {
                     analyser.getByteFrequencyData(data);
-                    let sum = 0;
-                    for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 2.5); // 게이지 감도 증가
+                    let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
+                    let avg = Math.round((sum / data.length) * 2.5);
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
-                    requestAnimationFrame(draw);
+                    if(audioContext.state !== 'closed') requestAnimationFrame(draw);
                 }
                 draw();
-            } catch(e) { console.error(e); }
+                log("장치 연결 성공: " + (mics.find(m => m.deviceId === deviceId)?.label || "기본값"));
+            } catch(e) { log("장치 연결 실패: " + e.message); }
         }
         initAudio();
 
@@ -274,78 +195,65 @@
             stopRec(); stopProRec();
         }
 
-        // 일반 모드
-        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        function startRec(mode) {
-            recognition = new SpeechRecognition();
-            recognition.interimResults = true; recognition.lang = 'ko-KR'; recognition.continuous = true;
-            recognition.onstart = () => { document.getElementById(mode + '-start').disabled = true; document.getElementById(mode + '-stop').disabled = false; };
-            recognition.onresult = (e) => {
-                let interim = ''; const finalSpan = document.getElementById(mode + '-final'); const interimSpan = document.getElementById(mode + '-interim');
-                for (let i = e.resultIndex; i < e.results.length; ++i) {
-                    if (e.results[i].isFinal) finalSpan.innerText += e.results[i][0].transcript + ' ';
-                    else interim += e.results[i][0].transcript;
-                }
-                interimSpan.innerText = interim;
-                document.getElementById(mode + '-scroll').scrollTop = 99999;
-            };
-            recognition.start();
-        }
-        function stopRec() { if(recognition) recognition.stop(); document.querySelectorAll('.btn-start').forEach(b => b.disabled = false); document.querySelectorAll('.btn-stop').forEach(b => b.disabled = true); }
-
-        // Pro 모드 (3초 녹음 -> 서버 전송)
         async function startProRec() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                isProRunning = true;
-                document.getElementById('pro-start').disabled = true;
-                document.getElementById('pro-stop').disabled = false;
-                document.getElementById('pro-error').style.display = 'none';
-                document.getElementById('y-info').innerHTML = "🟢 <strong>실시간 분석 중...</strong> 소리가 20% 이상은 나와야 자막이 잘 뜹니다.";
+            if (!stream) await initAudio();
+            isProRunning = true;
+            document.getElementById('pro-start').disabled = true;
+            document.getElementById('pro-stop').disabled = false;
+            log("🚀 Pro 자막 세션 시작...");
 
-                proInterval = setInterval(async () => {
-                    if (!isProRunning) return;
+            proInterval = setInterval(async () => {
+                if (!isProRunning) return;
+                const recorder = new MediaRecorder(stream);
+                const chunks = [];
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    if (blob.size < 1000) { log("⚠️ 소리 데이터가 너무 작음 (무음)"); return; }
                     
-                    // MediaRecorder를 사용하여 증폭된 스트림은 어렵지만 기본 스트림으로 전송
-                    const recorder = new MediaRecorder(stream);
-                    const chunks = [];
-                    recorder.ondataavailable = e => chunks.push(e.data);
-                    recorder.onstop = async () => {
-                        const blob = new Blob(chunks, { type: 'audio/webm' });
-                        const formData = new FormData();
-                        formData.append('file', blob, 'audio.webm');
-                        formData.append('model', 'whisper-large-v3');
-                        formData.append('language', 'ko');
-                        try {
-                            const res = await fetch('/api/stt', { method: 'POST', body: formData });
-                            const data = await res.json();
-                            if (data.text && data.text.trim().length > 1) {
-                                document.getElementById('youtube-text').innerHTML += data.text + " ";
-                                document.getElementById('youtube-scroll').scrollTop = 99999;
-                            }
-                        } catch (e) { 
-                            document.getElementById('pro-error').style.display = 'block';
-                            document.getElementById('pro-error').innerText = "⚠️ 자막 전송 실패 (네트워크나 API 키를 확인하세요)";
+                    const formData = new FormData();
+                    formData.append('file', blob, 'audio.webm');
+                    formData.append('model', 'whisper-large-v3');
+                    formData.append('language', 'ko');
+                    
+                    log(`☁️ 서버로 전송 중... (${Math.round(blob.size/1024)}KB)`);
+                    try {
+                        const res = await fetch('/api/stt', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (data.text) {
+                            document.getElementById('youtube-text').innerHTML += data.text + " ";
+                            document.getElementById('youtube-scroll').scrollTop = 99999;
                         }
-                    };
-                    recorder.start();
-                    setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
-                }, 3500);
-            } catch (err) { alert("마이크 권한을 허용해주세요!"); }
+                    } catch (e) { log("❌ 전송 실패: " + e.message); }
+                };
+                recorder.start();
+                setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
+            }, 3500);
         }
-        function stopProRec() { isProRunning = false; clearInterval(proInterval); document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true; document.getElementById('y-info').innerText = "⚪ 중지됨"; }
+
+        function stopProRec() { 
+            isProRunning = false; 
+            clearInterval(proInterval); 
+            document.getElementById('pro-start').disabled = false; 
+            document.getElementById('pro-stop').disabled = true; 
+            log("⏹️ 중지됨");
+        }
 
         async function callAI(mode) {
-            const text = mode === 'mic' ? document.getElementById('mic-final').innerText : document.getElementById('youtube-text').innerText;
-            if (text.length < 5) return alert("자막이 부족합니다.");
-            const aiBox = document.getElementById(mode + '-ai');
-            aiBox.innerText = "⏳ 요약 중...";
+            const text = document.getElementById('youtube-text').innerText;
+            if (text.length < 5) return alert("자막 부족");
+            log("🧠 AI 요약 요청 중...");
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
                 const data = await res.json();
-                aiBox.innerHTML = data.result || data.error;
-            } catch (e) { aiBox.innerText = "실패"; }
+                document.getElementById('youtube-ai').innerHTML = data.result || data.error;
+                log("✅ 요약 완료");
+            } catch (e) { log("❌ 요약 실패"); }
         }
+
+        // 일반 모드 (간략화)
+        function startRec() { alert("Pro 모드를 먼저 테스트해주세요!"); }
+        function stopRec() {}
     </script>
 </body>
 </html>
