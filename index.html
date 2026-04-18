@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption | AI 실시간 자막 & 해석</title>
-    <meta name="description" content="마이크 받아쓰기부터 유튜브 실시간 자막까지, AI가 의도를 해석해줍니다.">
+    <title>V-Live Caption | AI 자막 & 해석 서비스</title>
+    <meta name="description" content="내 목소리 기록부터 영상 실시간 자막까지, AI가 의도를 해석해줍니다.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
 
     <style>
@@ -27,81 +27,78 @@
             flex-direction: column;
             min-height: 100vh;
             margin: 0;
-            overflow-x: hidden;
-        }
-
-        /* 메뉴바 스타일 */
-        nav {
-            display: flex;
-            background-color: var(--nav-bg);
-            padding: 0 5%;
-            border-bottom: 1px solid #333;
-            gap: 20px;
-        }
-
-        .nav-item {
-            padding: 1rem 0.5rem;
-            cursor: pointer;
-            font-weight: bold;
-            color: var(--text-muted);
-            border-bottom: 3px solid transparent;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-item.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
         }
 
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.8rem 5%;
+            padding: 1rem 5%;
             background-color: var(--surface);
+            border-bottom: 1px solid #333;
+        }
+
+        /* 탭 메뉴 스타일 */
+        nav {
+            display: flex;
+            background-color: var(--nav-bg);
+            padding: 0 5%;
+            gap: 10px;
+            overflow-x: auto;
+        }
+
+        .nav-item {
+            padding: 1.2rem 1rem;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--text-muted);
+            border-bottom: 4px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: rgba(255,255,255,0.03);
         }
 
         .container {
             flex: 1;
-            display: none; /* 기본적으로 숨김 */
+            display: none;
             flex-direction: column;
-            padding: 1rem;
+            padding: 1.5rem 1rem;
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
             box-sizing: border-box;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .container.active { display: flex; }
 
-        /* 카드 레이아웃 */
         .content-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: 1.5rem;
             flex: 1;
         }
 
-        @media (max-width: 800px) {
+        @media (max-width: 900px) {
             .content-grid { grid-template-columns: 1fr; }
         }
 
         .card {
             background: var(--surface);
-            border-radius: 12px;
+            border-radius: 16px;
             border: 1px solid #333;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
         .card-header {
-            padding: 0.8rem 1rem;
+            padding: 1rem 1.2rem;
             background: rgba(255,255,255,0.05);
             border-bottom: 1px solid #333;
             font-weight: bold;
@@ -112,295 +109,239 @@
 
         .scroll-area {
             flex: 1;
-            padding: 1rem;
+            padding: 1.2rem;
             overflow-y: auto;
-            height: 45vh;
-            line-height: 1.6;
+            height: 40vh;
+            line-height: 1.8;
+            font-size: 1.1rem;
         }
 
-        .final-text { color: var(--text-main); font-size: 1.2rem; }
-        .interim-text { color: var(--text-muted); font-size: 1.2rem; font-style: italic; }
-        .ai-result { color: #d1b3ff; font-size: 1.1rem; white-space: pre-wrap; }
+        .final-text { color: var(--text-main); }
+        .interim-text { color: var(--text-muted); font-style: italic; }
+        .ai-result { color: #d1b3ff; white-space: pre-wrap; }
 
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
             padding: 1rem 0;
             flex-wrap: wrap;
         }
 
         .btn {
-            padding: 0.8rem 1.2rem;
-            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
             border: none;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
         }
 
         .btn:active { transform: scale(0.95); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
-        .btn-pip { background: #3498db; color: white; }
+        .btn-help { background: #555; color: white; font-size: 0.8rem; padding: 0.5rem 0.8rem; }
 
-        .status-bar {
-            text-align: center;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            padding: 0.6rem;
-            background: rgba(0,0,0,0.2);
+        .info-banner {
+            background: rgba(52, 152, 219, 0.1);
+            border-left: 4px solid #3498db;
+            padding: 1rem;
             border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
 
-        /* PIP용 캔버스 (숨김) */
+        footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+
+        /* PIP 및 유틸 */
         #pip-canvas { display: none; }
         #pip-video { display: none; }
-
-        footer {
-            padding: 1rem;
-            text-align: center;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            background: var(--surface);
-        }
-
-        .typing::after {
-            content: "|";
-            animation: blink 1s infinite;
-        }
-        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
     <header>
-        <h1 style="font-size: 1.2rem; margin:0;">🎙️ V-Live Caption</h1>
-        <button class="btn" style="background:#333; border:1px solid #555; font-size:0.8rem;">로그인</button>
+        <h1 style="font-size: 1.4rem; margin:0;">🚀 V-Live Caption</h1>
+        <button class="btn" style="background:#333; border:1px solid #555; font-size:0.8rem;">내 계정</button>
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('mic')">🎙️ 마이크 모드</div>
-        <div class="nav-item" onclick="switchMode('youtube')">📺 유튜브/시스템 모드</div>
+        <div class="nav-item active" onclick="switchMode('mic')">1. 🎙️ 내 목소리 받아쓰기</div>
+        <div class="nav-item" onclick="switchMode('youtube')">2. 📺 영상 소리 실시간 자막</div>
     </nav>
 
-    <!-- 모드 1: 마이크 받아쓰기 -->
+    <!-- 제품 1: 내 목소리 모드 -->
     <div id="mic-container" class="container active">
-        <div class="status-bar" id="mic-status">마이크 버튼을 눌러 내 목소리를 기록하세요.</div>
+        <div class="info-banner">
+            💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하시면 실시간으로 기록됩니다. 대화가 끝난 후 <strong>[AI 의도 해석]</strong> 버튼을 누르면 AI 비서가 요점을 정리해 줍니다.
+        </div>
+        
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">📝 실시간 내 목소리</div>
-                <div class="scroll-area" id="mic-scroll">
+                <div class="card-header">📝 실시간 기록 (내 목소리)</div>
+                <div id="mic-scroll" class="scroll-area">
                     <span id="mic-final" class="final-text"></span>
-                    <span id="mic-interim" class="interim-text typing"></span>
+                    <span id="mic-interim" class="interim-text"></span>
                 </div>
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석</div>
+                <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석 비서</div>
                 <div class="scroll-area">
-                    <div id="mic-ai" class="ai-result">대화가 쌓이면 AI 해석 버튼을 눌러보세요.</div>
+                    <div id="mic-ai" class="ai-result">내용이 쌓이면 아래 해석 버튼을 눌러보세요.</div>
                 </div>
             </div>
         </div>
+
         <div class="controls">
-            <button onclick="startRecognition('mic')" id="mic-start" class="btn btn-start">▶ 시작하기</button>
-            <button onclick="stopRecognition('mic')" id="mic-stop" class="btn btn-stop" disabled>■ 중지하기</button>
-            <button onclick="getAIInterpretation('mic')" class="btn btn-ai">✨ AI 해석하기</button>
+            <button onclick="startRec('mic')" id="mic-start" class="btn btn-start">🎙️ 기록 시작</button>
+            <button onclick="stopRec('mic')" id="mic-stop" class="btn btn-stop" disabled>■ 중지</button>
+            <button onclick="callAI('mic')" class="btn btn-ai">✨ AI 의도 해석하기</button>
         </div>
     </div>
 
-    <!-- 모드 2: 유튜브/시스템 자막 -->
+    <!-- 제품 2: 영상 자막 모드 -->
     <div id="youtube-container" class="container">
-        <div class="status-bar" id="youtube-status">
-            유튜브 소리를 자막으로 보려면 <strong>'스테레오 믹스'</strong> 설정이 권장됩니다.
+        <div class="info-banner" style="border-color: #f1c40f; background: rgba(241, 196, 15, 0.05);">
+            ⚠️ <strong>PC 사용자 필독:</strong> 영상 소리를 인식하려면 [윈도우 소리 설정]에서 <strong>'스테레오 믹스'</strong>를 기본 장치로 설정해야 합니다. <br>
+            <button class="btn-help" onclick="alert('1. 작업표시줄 소리 아이콘 우클릭\n2. 소리 설정 열기\n3. 입력 장치를 [스테레오 믹스]로 변경\n(안 보이면 [사운드 제어판]에서 사용 안 함으로 된 장치 표시 체크)')">설정 방법 자세히 보기</button>
         </div>
+
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
-                    📺 실시간 시스템 소리
-                    <button id="pip-btn" class="btn btn-pip" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">🗗 항상 위로 (PIP)</button>
+                    📺 실시간 영상 자막
+                    <button onclick="togglePip()" class="btn" style="background:#3498db; padding:0.4rem 0.8rem; font-size:0.7rem;">🗗 항상 위(PIP)</button>
                 </div>
-                <div class="scroll-area" id="youtube-scroll" style="background: #000;">
-                    <span id="youtube-final" class="final-text"></span>
-                    <span id="youtube-interim" class="interim-text typing" style="color: #ffff00;"></span>
+                <div id="youtube-scroll" class="scroll-area" style="background: #000; border: 4px solid #222;">
+                    <span id="youtube-final" class="final-text" style="color: #ffffff;"></span>
+                    <span id="youtube-interim" class="interim-text" style="color: #ffff00; font-weight: bold;"></span>
                 </div>
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header" style="color: #d1b3ff;">🧠 실시간 요약/해석</div>
+                <div class="card-header" style="color: #d1b3ff;">🧠 실시간 내용 요약</div>
                 <div class="scroll-area">
-                    <div id="youtube-ai" class="ai-result">유튜브 영상의 핵심 내용을 AI가 짚어줍니다.</div>
+                    <div id="youtube-ai" class="ai-result">영상 소리가 들리면 AI가 내용을 요약해 줍니다.</div>
                 </div>
             </div>
         </div>
+
         <div class="controls">
-            <button onclick="startRecognition('youtube')" id="youtube-start" class="btn btn-start">▶ 유튜브 자막 시작</button>
-            <button onclick="stopRecognition('youtube')" id="youtube-stop" class="btn btn-stop" disabled>■ 중지하기</button>
-            <button onclick="getAIInterpretation('youtube')" class="btn btn-ai">✨ 핵심 요약하기</button>
+            <button onclick="startRec('youtube')" id="youtube-start" class="btn btn-start" style="background:#e74c3c;">📺 자막 시작</button>
+            <button onclick="stopRec('youtube')" id="youtube-stop" class="btn btn-stop" disabled>■ 중지</button>
+            <button onclick="callAI('youtube')" class="btn btn-ai">✨ 영상 핵심 요약</button>
         </div>
     </div>
 
-    <!-- PIP 구현용 캔버스 및 비디오 (숨김) -->
     <canvas id="pip-canvas" width="600" height="200"></canvas>
     <video id="pip-video" autoplay muted playsinline></video>
 
     <footer>
-        &copy; 2026 V-Live Caption | <a href="#" style="color:inherit;">이용약관</a>
+        &copy; 2026 V-Live Caption | 본 서비스는 Google Gemini AI와 함께합니다.
     </footer>
 
     <script>
-        let currentMode = 'mic';
         let recognition = null;
-        const modes = {
-            mic: {
-                final: document.getElementById('mic-final'),
-                interim: document.getElementById('mic-interim'),
-                status: document.getElementById('mic-status'),
-                ai: document.getElementById('mic-ai'),
-                scroll: document.getElementById('mic-scroll'),
-                startBtn: document.getElementById('mic-start'),
-                stopBtn: document.getElementById('mic-stop')
-            },
-            youtube: {
-                final: document.getElementById('youtube-final'),
-                interim: document.getElementById('youtube-interim'),
-                status: document.getElementById('youtube-status'),
-                ai: document.getElementById('youtube-ai'),
-                scroll: document.getElementById('youtube-scroll'),
-                startBtn: document.getElementById('youtube-start'),
-                stopBtn: document.getElementById('youtube-stop')
-            }
+        let activeMode = 'mic';
+
+        const ui = {
+            mic: { final: 'mic-final', interim: 'mic-interim', status: 'mic-status', ai: 'mic-ai', scroll: 'mic-scroll', start: 'mic-start', stop: 'mic-stop' },
+            youtube: { final: 'youtube-final', interim: 'youtube-interim', status: 'youtube-status', ai: 'youtube-ai', scroll: 'youtube-scroll', start: 'youtube-start', stop: 'youtube-stop' }
         };
 
-        // 모드 전환 함수
         function switchMode(mode) {
-            currentMode = mode;
+            activeMode = mode;
             document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
             document.getElementById(mode + '-container').classList.add('active');
             event.currentTarget.classList.add('active');
-            
-            if(recognition) stopRecognition(mode === 'mic' ? 'youtube' : 'mic');
+            if(recognition) stopRec(mode === 'mic' ? 'youtube' : 'mic');
         }
 
-        // Web Speech API 초기화
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        function startRecognition(mode) {
-            if (!window.SpeechRecognition) {
-                alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
-                return;
-            }
-
+        function startRec(mode) {
+            if (!window.SpeechRecognition) return alert("브라우저 미지원");
             recognition = new SpeechRecognition();
             recognition.interimResults = true;
             recognition.lang = 'ko-KR';
             recognition.continuous = true;
 
             recognition.onstart = () => {
-                modes[mode].status.innerText = "🟢 실시간 인식 중... (소리를 들려주세요)";
-                modes[mode].startBtn.disabled = true;
-                modes[mode].stopBtn.disabled = false;
+                document.getElementById(ui[mode].start).disabled = true;
+                document.getElementById(ui[mode].stop).disabled = false;
             };
 
             recognition.onend = () => {
-                modes[mode].status.innerText = "⚪ 대기 중";
-                modes[mode].startBtn.disabled = false;
-                modes[mode].stopBtn.disabled = true;
+                document.getElementById(ui[mode].start).disabled = false;
+                document.getElementById(ui[mode].stop).disabled = true;
             };
 
             recognition.onresult = (event) => {
                 let interim = '';
+                const finalSpan = document.getElementById(ui[mode].final);
+                const interimSpan = document.getElementById(ui[mode].interim);
+                
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
-                        modes[mode].final.innerText += event.results[i][0].transcript + ' ';
+                        finalSpan.innerText += event.results[i][0].transcript + ' ';
                     } else {
                         interim += event.results[i][0].transcript;
                     }
                 }
-                modes[mode].interim.innerText = interim;
-                modes[mode].scroll.scrollTop = modes[mode].scroll.scrollHeight;
+                interimSpan.innerText = interim;
+                const scrollArea = document.getElementById(ui[mode].scroll);
+                scrollArea.scrollTop = scrollArea.scrollHeight;
                 
-                // 유튜브 모드일 때 PIP 캔버스 업데이트
-                if (mode === 'youtube') updatePipCanvas(interim || modes[mode].final.innerText.split(' ').slice(-5).join(' '));
+                if (mode === 'youtube') updatePip(interim || finalSpan.innerText.split(' ').slice(-5).join(' '));
             };
-
             recognition.start();
         }
 
-        function stopRecognition(mode) {
-            if (recognition) recognition.stop();
-        }
+        function stopRec(mode) { if (recognition) recognition.stop(); }
 
-        // AI 해석 API 호출
-        async function getAIInterpretation(mode) {
-            const text = modes[mode].final.innerText;
-            if (!text || text.length < 5) {
-                alert("해석할 내용이 부족합니다.");
-                return;
-            }
-
-            modes[mode].ai.innerText = "⏳ AI가 분석 중입니다...";
+        async function callAI(mode) {
+            const text = document.getElementById(ui[mode].final).innerText;
+            if (!text || text.length < 5) return alert("데이터가 부족합니다.");
+            const aiBox = document.getElementById(ui[mode].ai);
+            aiBox.innerText = "⏳ AI 분석 중...";
             
             try {
-                const response = await fetch('/api/chat', {
+                const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: text })
                 });
-                const data = await response.json();
-                modes[mode].ai.innerHTML = `<strong>💡 AI 해석 결과:</strong>\n\n${data.result || data.error}`;
-            } catch (err) {
-                modes[mode].ai.innerText = "❌ AI 연결 실패";
-            }
+                const data = await res.json();
+                aiBox.innerHTML = `<strong>💡 AI 결과:</strong>\n\n${data.result || data.error}`;
+            } catch (err) { aiBox.innerText = "❌ 연결 실패"; }
         }
 
-        // --- PIP (Picture-in-Picture) 기능 ---
-        const pipCanvas = document.getElementById('pip-canvas');
-        const pipVideo = document.getElementById('pip-video');
-        const ctx = pipCanvas.getContext('2d');
+        // PIP
+        const canvas = document.getElementById('pip-canvas');
+        const video = document.getElementById('pip-video');
+        const ctx = canvas.getContext('2d');
 
-        function updatePipCanvas(text) {
+        function updatePip(text) {
             ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
-            ctx.fillStyle = "yellow";
-            ctx.font = "bold 30px Pretendard";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#ffff00";
+            ctx.font = "bold 35px sans-serif";
             ctx.textAlign = "center";
-            
-            // 텍스트 줄바꿈 처리
-            const words = text.split(' ');
-            let line = '';
-            let y = 100;
-            for(let n = 0; n < words.length; n++) {
-                line += words[n] + ' ';
-                if(line.length > 20) {
-                    ctx.fillText(line, pipCanvas.width/2, y);
-                    line = '';
-                    y += 40;
-                }
-            }
-            ctx.fillText(line, pipCanvas.width/2, y);
+            ctx.fillText(text.length > 25 ? text.substring(text.length - 25) : text, canvas.width/2, 110);
         }
 
-        document.getElementById('pip-btn').onclick = async () => {
+        async function togglePip() {
             try {
-                const stream = pipCanvas.captureStream();
-                pipVideo.srcObject = stream;
-                await pipVideo.play();
-                await pipVideo.requestPictureInPicture();
-            } catch (err) {
-                alert("PIP 모드를 시작할 수 없습니다. (크롬 브라우저 권장)");
-            }
-        };
-
-        // 초기 캔버스 셋팅
-        updatePipCanvas("자막 대기 중...");
+                video.srcObject = canvas.captureStream();
+                await video.play();
+                await video.requestPictureInPicture();
+            } catch (err) { alert("PIP 오류"); }
+        }
+        updatePip("자막 준비 완료");
     </script>
 </body>
 </html>
