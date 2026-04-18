@@ -210,7 +210,7 @@
             <div class="selector-item">
                 <label>입력 장치 선택 (Input)</label>
                 <select id="device-select" onchange="initAudio()"><option value="">장치 감지 중...</option></select>
-                <span id="device-hint" class="device-hint">시스템 기본 마이크 사용 중</span>
+                <span id="device-hint" class="device-hint">시스템 기본 마이크 강제 사용 중</span>
             </div>
             <div class="selector-item">
                 <label>자막 모드 선택 (Mode)</label>
@@ -277,12 +277,12 @@
         let stream = null;
         let recognition = null;
         let lastLoggedText = ""; 
+        let restartTimer = null;
         
         const pipCanvas = document.getElementById('pip-canvas');
         const pipVideo = document.getElementById('pip-video');
         const pipCtx = pipCanvas.getContext('2d');
 
-        // 엔진 선택에 따른 UI 업데이트
         function updateEngineUI() {
             const engine = document.getElementById('engine-select').value;
             const deviceSelect = document.getElementById('device-select');
@@ -291,17 +291,15 @@
             if (engine === 'web-speech') {
                 deviceSelect.disabled = true;
                 deviceHint.style.display = 'block';
-                log("[안내] 일반 모드는 브라우저 기본 마이크를 사용합니다.");
-                // 일반 모드일 땐 시스템 기본 장치로 오디오 다시 연결 시도
+                log("[안내] 일반 모드는 브라우저 설정의 '기본 마이크'만 사용합니다.");
                 initAudio(true); 
             } else {
                 deviceSelect.disabled = false;
                 deviceHint.style.display = 'none';
-                log("[안내] 고정밀 모드는 선택한 입력 장치를 직접 사용합니다.");
+                log("[안내] 고정밀 모드는 선택한 장치에서 직접 소리를 추출합니다.");
             }
         }
 
-        // 로컬 데이터 로드
         window.onload = () => {
             const saved = localStorage.getItem('vlive_transcript');
             if(saved) document.getElementById('youtube-text').innerText = saved;
@@ -316,7 +314,7 @@
                 document.getElementById('text-color-picker').value = savedColor;
                 updateStyle();
             }
-            updateEngineUI(); // 초기 엔진 UI 설정
+            updateEngineUI(); 
         };
 
         function updateStyle() {
@@ -329,26 +327,25 @@
         }
 
         function clearTranscript() {
-            if(confirm("현재 기록된 모든 자막을 삭제하시겠습니까?")) {
+            if(confirm("기록을 삭제할까요?")) {
                 document.getElementById('youtube-text').innerText = "";
                 document.getElementById('interim-text').innerText = "";
                 localStorage.removeItem('vlive_transcript');
-                log("기록이 초기화되었습니다.");
+                log("기록 초기화 완료.");
             }
         }
 
         function downloadTranscript() {
             const text = document.getElementById('youtube-text').innerText;
-            if(!text) return alert("다운로드할 자막 내용이 없습니다.");
+            if(!text) return alert("다운로드할 자막이 없습니다.");
             const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             const now = new Date();
-            const dateStr = `${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}`;
-            a.download = `V-Live_자막_${dateStr}.txt`;
+            a.download = `V-Live_자막_${now.getHours()}${now.getMinutes()}.txt`;
             a.click();
-            log("자막 파일이 성공적으로 추출되었습니다.");
+            log("자막 추출 완료.");
         }
 
         const log = (msg, isError = false) => {
@@ -379,7 +376,7 @@
             try {
                 if (audioContext) audioContext.close();
                 let deviceId = document.getElementById('device-select').value;
-                if (useDefault) deviceId = undefined; // 기본 장치 강제
+                if (useDefault) deviceId = undefined; 
 
                 const constraints = { 
                     audio: { 
@@ -474,7 +471,7 @@
         function startWebSpeech(lang) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                log("브라우저가 음성 인식을 지원하지 않습니다. (Chrome/Edge 권장)", true);
+                log("음성 인식을 지원하지 않는 브라우저입니다.", true);
                 stopProRec();
                 return;
             }
@@ -516,13 +513,24 @@
 
             recognition.onerror = (e) => {
                 if (e.error === 'no-speech') {
-                    console.log("[Web STT] Silence timeout, restarting...");
+                    // 침묵 타임아웃일 땐 로그만 남기고 무시 (자동 재시작 유도)
+                    console.log("[Web STT] Silence timeout.");
                 } else {
                     log(`[일반 모드 에러] ${e.error}`, true);
                 }
             };
 
-            recognition.onend = () => { if (isProRunning) recognition.start(); };
+            recognition.onend = () => {
+                if (isProRunning) {
+                    // 침묵으로 인해 꺼진 경우 1초 뒤 즉시 재시작
+                    if(restartTimer) clearTimeout(restartTimer);
+                    restartTimer = setTimeout(() => {
+                        if(isProRunning) {
+                            try { recognition.start(); log("[시스템] 엔진 재연결됨"); } catch(err) {}
+                        }
+                    }, 1000);
+                }
+            };
 
             try {
                 recognition.start();
@@ -565,6 +573,7 @@
         function stopProRec() { 
             isProRunning = false; 
             if (proInterval) clearInterval(proInterval); 
+            if(restartTimer) clearTimeout(restartTimer);
             if (recognition) {
                 recognition.onend = null;
                 try { recognition.stop(); } catch(e) {}
