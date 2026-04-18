@@ -298,11 +298,22 @@
         };
 
         function cleanText(text) {
-            const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you."];
             let cleaned = text.trim();
             if(!cleaned) return "";
+
+            // 1. 단어 무한 도배 방지 (연속된 중복 단어/문구 제거)
+            // 예: "방금 방금 방금" -> "방금"
+            const words = cleaned.split(/\s+/);
+            const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
+            cleaned = dedupedWords.join(' ');
+
+            // 2. 특정 금지어/소음 패턴 필터링
+            const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
             if(noise.some(n => cleaned.toLowerCase() === n)) return "";
+
+            // 3. 직전 결과와 완전히 동일하면 무시
             if(cleaned === lastLoggedText) return ""; 
+            
             lastLoggedText = cleaned;
             return cleaned;
         }
@@ -387,19 +398,17 @@
             document.getElementById('model-loading').style.display = 'block';
             try {
                 if (!whisperInstance) {
-                    // WebGPU 시도 (지원되는 브라우저에서 성능 향상)
                     whisperInstance = await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
                         device: 'webgpu', 
                         progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
                     }).catch(async () => {
-                        log("[안내] WebGPU 미지원. CPU 모드로 전환합니다.");
                         return await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
                             progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
                         });
                     });
                 }
                 document.getElementById('model-loading').style.display = 'none';
-                log("[로컬 AI] 가동 완료. (3초마다 분석)");
+                log("[로컬 AI] 가동 완료.");
 
                 proInterval = setInterval(async () => {
                     if (!isProRunning) return;
@@ -412,9 +421,18 @@
                         const internalAudioCtx = new AudioContext({ sampleRate: 16000 });
                         const decoded = await internalAudioCtx.decodeAudioData(audioData);
                         const audioFloat32 = decoded.getChannelData(0);
-                        const result = await whisperInstance(audioFloat32, { language: lang === 'auto' ? null : lang, task: 'transcribe' });
+
+                        // 추론 옵션 강화 (Hallucination 방지 유도)
+                        const result = await whisperInstance(audioFloat32, { 
+                            language: lang === 'auto' ? null : lang, 
+                            task: 'transcribe',
+                            return_timestamps: false,
+                            chunk_length_s: 30,
+                            stride_length_s: 5
+                        });
+
                         const cleaned = cleanText(result.text);
-                        if (cleaned) {
+                        if (cleaned && cleaned.length > 1) {
                             const el = document.getElementById('youtube-text');
                             el.innerText += cleaned + " ";
                             localStorage.setItem('vlive_transcript', el.innerText);
@@ -423,7 +441,6 @@
                         await internalAudioCtx.close();
                     };
                     recorder.start();
-                    // 3초 단위로 짧게 분석하여 고정밀 모드와 속도 맞춤
                     setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
                 }, 3500);
             } catch (e) { log("로컬 에러: " + e.message, true); }
