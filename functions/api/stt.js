@@ -10,37 +10,42 @@ export async function onRequestPost(context) {
   if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const key = env.GROQ_API_KEY ? env.GROQ_API_KEY.trim() : "";
+    
+    // 1. 키 상태 진단 (로그용)
+    if (!key) {
+      return new Response(JSON.stringify({ error: "API 키가 등록되지 않았습니다 (Variable name: GROQ_API_KEY)" }), { status: 500, headers: corsHeaders });
+    }
+
+    const keyPrefix = key.substring(0, 4); // 키 앞부분만 추출 (진단용)
+
     const formData = await request.formData();
     const audioBlob = formData.get('file');
 
     if (!audioBlob) {
-      return new Response(JSON.stringify({ error: "음성 데이터가 누락되었습니다." }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "음성 데이터가 없습니다." }), { status: 400, headers: corsHeaders });
     }
 
-    // Groq 전용 FormData 재구성 (안전하게 다시 쌓기)
-    const groqFormData = new FormData();
-    groqFormData.append("file", audioBlob, "recording.webm");
-    groqFormData.append("model", "whisper-large-v3");
-    groqFormData.append("language", "ko");
-    groqFormData.append("response_format", "json");
-
+    // Groq Whisper 호출
     const groqResponse = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${env.GROQ_API_KEY}` },
-      body: groqFormData
+      headers: { "Authorization": `Bearer ${key}` },
+      body: formData
     });
 
     const data = await groqResponse.json();
 
-    // Groq가 에러를 보냈을 경우
     if (!groqResponse.ok) {
-      return new Response(JSON.stringify({ error: data.error?.message || "Groq API 통신 실패" }), { 
+      // 에러 메시지에 사용 중인 키의 앞부분을 포함시켜 진단 지원
+      return new Response(JSON.stringify({ 
+        error: `Groq 에러: ${data.error?.message || "알 수 없는 에러"} (사용 중인 키 시작: ${keyPrefix}...)` 
+      }), { 
         status: groqResponse.status, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       });
     }
 
-    return new Response(JSON.stringify({ text: data.text || "" }), {
+    return new Response(JSON.stringify({ text: data.text || "", debug: `Key used: ${keyPrefix}...` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
