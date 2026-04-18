@@ -156,7 +156,15 @@
                 if (audioContext) audioContext.close();
                 const deviceId = document.getElementById('device-select').value;
                 
-                const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
+                // [수정] 자동 볼륨 조절(AGC) 및 노이즈 제거 기능을 꺼서 감도 저하 방지
+                const constraints = {
+                    audio: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false // 이게 범인입니다!
+                    }
+                };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 // 장치 목록 업데이트 (최초 1회 및 권한 획득 후)
