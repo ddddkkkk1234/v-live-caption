@@ -86,7 +86,7 @@
             border-radius: 16px; 
             border: 1px solid var(--border);
         }
-        .selector-item { display: flex; flex-direction: column; gap: 8px; }
+        .selector-item { display: flex; flex-direction: column; gap: 8px; position: relative; }
         .selector-item label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         select, input[type="range"], input[type="color"] { 
             background: var(--surface-light); 
@@ -98,6 +98,18 @@
             outline: none;
             width: 100%;
             cursor: pointer;
+            transition: all 0.2s;
+        }
+        select:disabled { opacity: 0.3; cursor: not-allowed; background: #111; }
+
+        .device-hint { 
+            position: absolute; 
+            bottom: -18px; 
+            left: 2px; 
+            font-size: 0.6rem; 
+            color: var(--primary); 
+            font-weight: bold; 
+            display: none; 
         }
 
         .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; flex: 1; min-height: 500px; }
@@ -198,10 +210,11 @@
             <div class="selector-item">
                 <label>입력 장치 선택 (Input)</label>
                 <select id="device-select" onchange="initAudio()"><option value="">장치 감지 중...</option></select>
+                <span id="device-hint" class="device-hint">시스템 기본 마이크 사용 중</span>
             </div>
             <div class="selector-item">
                 <label>자막 모드 선택 (Mode)</label>
-                <select id="engine-select">
+                <select id="engine-select" onchange="updateEngineUI()">
                     <option value="web-speech" selected>일반 자막 모드 (Standard)</option>
                     <option value="groq">고정밀 AI 모드 (Premium)</option>
                 </select>
@@ -269,6 +282,25 @@
         const pipVideo = document.getElementById('pip-video');
         const pipCtx = pipCanvas.getContext('2d');
 
+        // 엔진 선택에 따른 UI 업데이트
+        function updateEngineUI() {
+            const engine = document.getElementById('engine-select').value;
+            const deviceSelect = document.getElementById('device-select');
+            const deviceHint = document.getElementById('device-hint');
+
+            if (engine === 'web-speech') {
+                deviceSelect.disabled = true;
+                deviceHint.style.display = 'block';
+                log("[안내] 일반 모드는 브라우저 기본 마이크를 사용합니다.");
+                // 일반 모드일 땐 시스템 기본 장치로 오디오 다시 연결 시도
+                initAudio(true); 
+            } else {
+                deviceSelect.disabled = false;
+                deviceHint.style.display = 'none';
+                log("[안내] 고정밀 모드는 선택한 입력 장치를 직접 사용합니다.");
+            }
+        }
+
         // 로컬 데이터 로드
         window.onload = () => {
             const saved = localStorage.getItem('vlive_transcript');
@@ -284,6 +316,7 @@
                 document.getElementById('text-color-picker').value = savedColor;
                 updateStyle();
             }
+            updateEngineUI(); // 초기 엔진 UI 설정
         };
 
         function updateStyle() {
@@ -342,14 +375,16 @@
             return cleaned;
         }
 
-        async function initAudio() {
+        async function initAudio(useDefault = false) {
             try {
                 if (audioContext) audioContext.close();
-                const deviceId = document.getElementById('device-select').value;
+                let deviceId = document.getElementById('device-select').value;
+                if (useDefault) deviceId = undefined; // 기본 장치 강제
+
                 const constraints = { 
                     audio: { 
                         deviceId: deviceId ? { exact: deviceId } : undefined, 
-                        autoGainControl: false,
+                        autoGainControl: false, 
                         echoCancellation: false,
                         noiseSuppression: false
                     } 
@@ -360,7 +395,7 @@
                 const mics = devices.filter(d => d.kind === 'audioinput');
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
-                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '기본 마이크'}</option>`).join('');
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === (useDefault ? mics[0]?.deviceId : currentVal) ? 'selected' : ''}>${m.label || '기본 마이크'}</option>`).join('');
 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioContext.state === 'suspended') await audioContext.resume();
@@ -464,7 +499,6 @@
                     }
                 }
 
-                // 중간 결과 표시
                 const interimEl = document.getElementById('interim-text');
                 interimEl.innerText = interimTranscript;
 
@@ -481,7 +515,6 @@
             };
 
             recognition.onerror = (e) => {
-                // no-speech는 에러라기보다 타임아웃이므로 로그만 남기고 조용히 넘김
                 if (e.error === 'no-speech') {
                     console.log("[Web STT] Silence timeout, restarting...");
                 } else {
@@ -489,11 +522,7 @@
                 }
             };
 
-            recognition.onend = () => {
-                if (isProRunning) {
-                    recognition.start(); // 조용히 재시작
-                }
-            };
+            recognition.onend = () => { if (isProRunning) recognition.start(); };
 
             try {
                 recognition.start();
