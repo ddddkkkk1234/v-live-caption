@@ -3,22 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption | AI 실시간 해석</title>
-    <meta name="description" content="AI가 실시간으로 음성을 받아쓰고, 그 의도까지 해석해줍니다.">
-    <meta property="og:title" content="V-Live Caption | AI 실시간 해석">
-    <meta property="og:description" content="단순한 받아쓰기를 넘어, AI가 대화의 핵심을 짚어줍니다.">
-    <meta property="og:image" content="https://via.placeholder.com/800x400/1a1a1a/ffffff?text=AI+Live+Caption">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+    <title>V-Live Caption | AI 실시간 자막 & 해석</title>
+    <meta name="description" content="마이크 받아쓰기부터 유튜브 실시간 자막까지, AI가 의도를 해석해줍니다.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
 
     <style>
         :root {
             --primary: #4CAF50;
-            --ai-accent: #8E44AD; /* AI 해석 강조색 (보라색) */
+            --ai-accent: #8E44AD;
             --danger: #f44336;
             --bg-color: #121212;
             --surface: #1e1e1e;
             --text-main: #ffffff;
             --text-muted: #aaaaaa;
+            --nav-bg: #252525;
         }
 
         body {
@@ -29,20 +27,46 @@
             flex-direction: column;
             min-height: 100vh;
             margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* 메뉴바 스타일 */
+        nav {
+            display: flex;
+            background-color: var(--nav-bg);
+            padding: 0 5%;
+            border-bottom: 1px solid #333;
+            gap: 20px;
+        }
+
+        .nav-item {
+            padding: 1rem 0.5rem;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--text-muted);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
         }
 
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 5%;
+            padding: 0.8rem 5%;
             background-color: var(--surface);
-            border-bottom: 1px solid #333;
         }
 
         .container {
             flex: 1;
-            display: flex;
+            display: none; /* 기본적으로 숨김 */
             flex-direction: column;
             padding: 1rem;
             max-width: 1200px;
@@ -52,7 +76,9 @@
             gap: 1rem;
         }
 
-        /* 메인 레이아웃: 받아쓰기와 AI 해석을 나란히 (PC) / 위아래 (모바일) */
+        .container.active { display: flex; }
+
+        /* 카드 레이아웃 */
         .content-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -80,37 +106,32 @@
             border-bottom: 1px solid #333;
             font-weight: bold;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 0.5rem;
         }
 
         .scroll-area {
             flex: 1;
             padding: 1rem;
             overflow-y: auto;
-            height: 40vh;
+            height: 45vh;
             line-height: 1.6;
         }
 
-        #final-text { color: var(--text-main); font-size: 1.1rem; }
-        #interim-text { color: var(--text-muted); font-size: 1.1rem; font-style: italic; }
-
-        /* AI 해석 스타일 */
-        #ai-interpretation {
-            color: #d1b3ff;
-            font-size: 1.1rem;
-            white-space: pre-wrap;
-        }
+        .final-text { color: var(--text-main); font-size: 1.2rem; }
+        .interim-text { color: var(--text-muted); font-size: 1.2rem; font-style: italic; }
+        .ai-result { color: #d1b3ff; font-size: 1.1rem; white-space: pre-wrap; }
 
         .controls {
             display: flex;
             gap: 10px;
             justify-content: center;
             padding: 1rem 0;
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 0.8rem 1.5rem;
+            padding: 0.8rem 1.2rem;
             border-radius: 8px;
             border: none;
             font-weight: bold;
@@ -127,15 +148,20 @@
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
+        .btn-pip { background: #3498db; color: white; }
 
         .status-bar {
             text-align: center;
             font-size: 0.9rem;
             color: var(--text-muted);
-            padding: 0.5rem;
+            padding: 0.6rem;
             background: rgba(0,0,0,0.2);
-            border-radius: 5px;
+            border-radius: 8px;
         }
+
+        /* PIP용 캔버스 (숨김) */
+        #pip-canvas { display: none; }
+        #pip-video { display: none; }
 
         footer {
             padding: 1rem;
@@ -145,7 +171,6 @@
             background: var(--surface);
         }
 
-        /* 애니메이션 효과 */
         .typing::after {
             content: "|";
             animation: blink 1s infinite;
@@ -156,133 +181,226 @@
 <body>
 
     <header>
-        <h1>🎙️ V-Live Caption</h1>
+        <h1 style="font-size: 1.2rem; margin:0;">🎙️ V-Live Caption</h1>
         <button class="btn" style="background:#333; border:1px solid #555; font-size:0.8rem;">로그인</button>
     </header>
 
-    <div class="container">
-        <div class="status-bar" id="status-bar">마이크 버튼을 눌러 시작하세요.</div>
+    <nav>
+        <div class="nav-item active" onclick="switchMode('mic')">🎙️ 마이크 모드</div>
+        <div class="nav-item" onclick="switchMode('youtube')">📺 유튜브/시스템 모드</div>
+    </nav>
 
+    <!-- 모드 1: 마이크 받아쓰기 -->
+    <div id="mic-container" class="container active">
+        <div class="status-bar" id="mic-status">마이크 버튼을 눌러 내 목소리를 기록하세요.</div>
         <div class="content-grid">
-            <!-- 1. 받아쓰기 카드 -->
             <div class="card">
-                <div class="card-header">📝 실시간 받아쓰기</div>
-                <div class="scroll-area" id="caption-scroll">
-                    <span id="final-text"></span>
-                    <span id="interim-text" class="typing"></span>
+                <div class="card-header">📝 실시간 내 목소리</div>
+                <div class="scroll-area" id="mic-scroll">
+                    <span id="mic-final" class="final-text"></span>
+                    <span id="mic-interim" class="interim-text typing"></span>
                 </div>
             </div>
-
-            <!-- 2. AI 해석 카드 -->
             <div class="card" style="border-color: var(--ai-accent);">
                 <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석</div>
-                <div class="scroll-area" id="ai-scroll">
-                    <div id="ai-interpretation">사용자가 말을 하면 AI가 요점과 의도를 분석하여 이곳에 표시합니다.</div>
+                <div class="scroll-area">
+                    <div id="mic-ai" class="ai-result">대화가 쌓이면 AI 해석 버튼을 눌러보세요.</div>
                 </div>
             </div>
         </div>
-
         <div class="controls">
-            <button id="start-btn" class="btn btn-start">▶ 시작하기</button>
-            <button id="stop-btn" class="btn btn-stop" disabled>■ 중지하기</button>
-            <button id="ai-btn" class="btn btn-ai">✨ AI 해석하기</button>
+            <button onclick="startRecognition('mic')" id="mic-start" class="btn btn-start">▶ 시작하기</button>
+            <button onclick="stopRecognition('mic')" id="mic-stop" class="btn btn-stop" disabled>■ 중지하기</button>
+            <button onclick="getAIInterpretation('mic')" class="btn btn-ai">✨ AI 해석하기</button>
         </div>
     </div>
 
+    <!-- 모드 2: 유튜브/시스템 자막 -->
+    <div id="youtube-container" class="container">
+        <div class="status-bar" id="youtube-status">
+            유튜브 소리를 자막으로 보려면 <strong>'스테레오 믹스'</strong> 설정이 권장됩니다.
+        </div>
+        <div class="content-grid">
+            <div class="card">
+                <div class="card-header">
+                    📺 실시간 시스템 소리
+                    <button id="pip-btn" class="btn btn-pip" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">🗗 항상 위로 (PIP)</button>
+                </div>
+                <div class="scroll-area" id="youtube-scroll" style="background: #000;">
+                    <span id="youtube-final" class="final-text"></span>
+                    <span id="youtube-interim" class="interim-text typing" style="color: #ffff00;"></span>
+                </div>
+            </div>
+            <div class="card" style="border-color: var(--ai-accent);">
+                <div class="card-header" style="color: #d1b3ff;">🧠 실시간 요약/해석</div>
+                <div class="scroll-area">
+                    <div id="youtube-ai" class="ai-result">유튜브 영상의 핵심 내용을 AI가 짚어줍니다.</div>
+                </div>
+            </div>
+        </div>
+        <div class="controls">
+            <button onclick="startRecognition('youtube')" id="youtube-start" class="btn btn-start">▶ 유튜브 자막 시작</button>
+            <button onclick="stopRecognition('youtube')" id="youtube-stop" class="btn btn-stop" disabled>■ 중지하기</button>
+            <button onclick="getAIInterpretation('youtube')" class="btn btn-ai">✨ 핵심 요약하기</button>
+        </div>
+    </div>
+
+    <!-- PIP 구현용 캔버스 및 비디오 (숨김) -->
+    <canvas id="pip-canvas" width="600" height="200"></canvas>
+    <video id="pip-video" autoplay muted playsinline></video>
+
     <footer>
-        &copy; 2026 V-Live Caption | <a href="#" style="color:inherit;">문의하기</a>
+        &copy; 2026 V-Live Caption | <a href="#" style="color:inherit;">이용약관</a>
     </footer>
 
     <script>
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        const aiBtn = document.getElementById('ai-btn');
-        const finalTextSpan = document.getElementById('final-text');
-        const interimTextSpan = document.getElementById('interim-text');
-        const aiBox = document.getElementById('ai-interpretation');
-        const statusBar = document.getElementById('status-bar');
-        const captionScroll = document.getElementById('caption-scroll');
-
-        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let currentMode = 'mic';
         let recognition = null;
+        const modes = {
+            mic: {
+                final: document.getElementById('mic-final'),
+                interim: document.getElementById('mic-interim'),
+                status: document.getElementById('mic-status'),
+                ai: document.getElementById('mic-ai'),
+                scroll: document.getElementById('mic-scroll'),
+                startBtn: document.getElementById('mic-start'),
+                stopBtn: document.getElementById('mic-stop')
+            },
+            youtube: {
+                final: document.getElementById('youtube-final'),
+                interim: document.getElementById('youtube-interim'),
+                status: document.getElementById('youtube-status'),
+                ai: document.getElementById('youtube-ai'),
+                scroll: document.getElementById('youtube-scroll'),
+                startBtn: document.getElementById('youtube-start'),
+                stopBtn: document.getElementById('youtube-stop')
+            }
+        };
 
-        if (window.SpeechRecognition) {
-            recognition = new RecognitionHelper();
-        } else {
-            statusBar.innerText = "이 브라우저는 음성 인식을 지원하지 않습니다.";
-            startBtn.disabled = true;
+        // 모드 전환 함수
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(mode + '-container').classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            if(recognition) stopRecognition(mode === 'mic' ? 'youtube' : 'mic');
         }
 
-        function RecognitionHelper() {
-            const rec = new SpeechRecognition();
-            rec.interimResults = true;
-            rec.lang = 'ko-KR';
-            rec.continuous = true;
+        // Web Speech API 초기화
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-            rec.onstart = () => {
-                statusBar.innerText = "🟢 실시간 인식 중...";
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
+        function startRecognition(mode) {
+            if (!window.SpeechRecognition) {
+                alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.interimResults = true;
+            recognition.lang = 'ko-KR';
+            recognition.continuous = true;
+
+            recognition.onstart = () => {
+                modes[mode].status.innerText = "🟢 실시간 인식 중... (소리를 들려주세요)";
+                modes[mode].startBtn.disabled = true;
+                modes[mode].stopBtn.disabled = false;
             };
 
-            rec.onend = () => {
-                statusBar.innerText = "⚪ 대기 중";
-                startBtn.disabled = false;
-                stopBtn.disabled = true;
+            recognition.onend = () => {
+                modes[mode].status.innerText = "⚪ 대기 중";
+                modes[mode].startBtn.disabled = false;
+                modes[mode].stopBtn.disabled = true;
             };
 
-            rec.onresult = (event) => {
+            recognition.onresult = (event) => {
                 let interim = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
-                        finalTextSpan.innerText += event.results[i][0].transcript + ' ';
+                        modes[mode].final.innerText += event.results[i][0].transcript + ' ';
                     } else {
                         interim += event.results[i][0].transcript;
                     }
                 }
-                interimTextSpan.innerText = interim;
-                captionScroll.scrollTop = captionScroll.scrollHeight;
+                modes[mode].interim.innerText = interim;
+                modes[mode].scroll.scrollTop = modes[mode].scroll.scrollHeight;
+                
+                // 유튜브 모드일 때 PIP 캔버스 업데이트
+                if (mode === 'youtube') updatePipCanvas(interim || modes[mode].final.innerText.split(' ').slice(-5).join(' '));
             };
 
-            return rec;
+            recognition.start();
         }
 
-        startBtn.onclick = () => recognition.start();
-        stopBtn.onclick = () => recognition.stop();
+        function stopRecognition(mode) {
+            if (recognition) recognition.stop();
+        }
 
-        // AI 해석 기능 (실제 API 호출 버전)
-        aiBtn.onclick = async () => {
-            const text = finalTextSpan.innerText;
+        // AI 해석 API 호출
+        async function getAIInterpretation(mode) {
+            const text = modes[mode].final.innerText;
             if (!text || text.length < 5) {
-                alert("해석할 내용이 부족합니다. 좀 더 말씀해 주세요!");
+                alert("해석할 내용이 부족합니다.");
                 return;
             }
 
-            aiBox.innerText = "⏳ AI가 의도를 분석 중입니다...";
-            aiBtn.disabled = true;
+            modes[mode].ai.innerText = "⏳ AI가 분석 중입니다...";
             
             try {
-                // Cloudflare Functions API 호출
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: text })
                 });
-
                 const data = await response.json();
-                
-                if (data.result) {
-                    aiBox.innerHTML = `<strong>💡 AI 해석 결과:</strong>\n\n${data.result}`;
-                } else if (data.error) {
-                    aiBox.innerText = "❌ 오류: " + data.error;
-                }
+                modes[mode].ai.innerHTML = `<strong>💡 AI 해석 결과:</strong>\n\n${data.result || data.error}`;
             } catch (err) {
-                console.error(err);
-                aiBox.innerText = "❌ AI 연결 실패. API 키 설정을 확인해주세요.";
-            } finally {
-                aiBtn.disabled = false;
+                modes[mode].ai.innerText = "❌ AI 연결 실패";
+            }
+        }
+
+        // --- PIP (Picture-in-Picture) 기능 ---
+        const pipCanvas = document.getElementById('pip-canvas');
+        const pipVideo = document.getElementById('pip-video');
+        const ctx = pipCanvas.getContext('2d');
+
+        function updatePipCanvas(text) {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
+            ctx.fillStyle = "yellow";
+            ctx.font = "bold 30px Pretendard";
+            ctx.textAlign = "center";
+            
+            // 텍스트 줄바꿈 처리
+            const words = text.split(' ');
+            let line = '';
+            let y = 100;
+            for(let n = 0; n < words.length; n++) {
+                line += words[n] + ' ';
+                if(line.length > 20) {
+                    ctx.fillText(line, pipCanvas.width/2, y);
+                    line = '';
+                    y += 40;
+                }
+            }
+            ctx.fillText(line, pipCanvas.width/2, y);
+        }
+
+        document.getElementById('pip-btn').onclick = async () => {
+            try {
+                const stream = pipCanvas.captureStream();
+                pipVideo.srcObject = stream;
+                await pipVideo.play();
+                await pipVideo.requestPictureInPicture();
+            } catch (err) {
+                alert("PIP 모드를 시작할 수 없습니다. (크롬 브라우저 권장)");
             }
         };
+
+        // 초기 캔버스 셋팅
+        updatePipCanvas("자막 대기 중...");
     </script>
 </body>
 </html>
