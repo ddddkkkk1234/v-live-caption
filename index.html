@@ -76,7 +76,6 @@
         .container { flex: 1; display: none; flex-direction: column; padding: 1.5rem 5%; max-width: 1400px; margin: 0 auto; width: 100%; gap: 1.5rem; }
         .container.active { display: flex; }
 
-        /* 모델 로딩 프로그레스 바 */
         #model-loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: #222; z-index: 1000; }
         #model-loading-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.3s; box-shadow: 0 0 10px var(--primary); }
 
@@ -101,7 +100,6 @@
             outline: none;
             width: 100%;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
         .content-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 1.5rem; flex: 1; min-height: 550px; }
@@ -180,9 +178,8 @@
             <div class="selector-item">
                 <label>자막 모드 선택 (Mode)</label>
                 <select id="engine-select">
-                    <option value="local-whisper">완전 로컬 AI 모드 (Best/Free)</option>
-                    <option value="web-speech">표준 브라우저 모드 (Lite/Free)</option>
-                    <option value="groq">고정밀 AI 모드 (Premium/API)</option>
+                    <option value="local-whisper" selected>일반 자막 모드 (로컬 AI/무제한)</option>
+                    <option value="groq">고정밀 자막 모드 (클라우드/Pro)</option>
                 </select>
             </div>
             <div class="selector-item">
@@ -224,18 +221,16 @@
             <button onclick="downloadTranscript()" class="btn btn-download">📥 TXT 다운로드</button>
         </div>
 
-        <div id="debug-log">시스템 준비 완료. 완전 로컬 모드는 최초 실행 시 모델 로딩이 필요합니다.</div>
+        <div id="debug-log">시스템 준비 완료.</div>
     </div>
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
     <video id="pip-video" autoplay playsinline muted></video>
 
-    <!-- Transformers.js 라이브러리 -->
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
         window.WhisperPipeline = pipeline;
         window.WhisperEnv = env;
-        // 모델 파일 캐싱 설정
         env.allowLocalModels = false;
         env.useBrowserCache = true;
     </script>
@@ -245,10 +240,8 @@
         let isProRunning = false;
         let audioContext = null;
         let stream = null;
-        let recognition = null;
         let lastLoggedText = ""; 
-        let restartTimer = null;
-        let localWhisperWorker = null;
+        let whisperInstance = null;
         
         const pipCanvas = document.getElementById('pip-canvas');
         const pipVideo = document.getElementById('pip-video');
@@ -326,12 +319,14 @@
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
                 select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
+                
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 512;
                 source.connect(analyser);
                 const data = new Uint8Array(analyser.frequencyBinCount);
+                
                 function draw() {
                     if(!audioContext || audioContext.state === 'closed') return;
                     analyser.getByteFrequencyData(data);
@@ -354,7 +349,7 @@
             pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
             const fullText = (document.getElementById('youtube-text').innerText + " " + document.getElementById('interim-text').innerText).trim();
             const words = fullText.split(' ').slice(-8).join(' ');
-            pipCtx.fillText(words.join(' '), pipCanvas.width/2, pipCanvas.height/2 + 15);
+            pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
         }
 
         async function togglePIP() {
@@ -372,6 +367,7 @@
         }
 
         async function startProRec() {
+            if(!stream) await initAudio();
             const engine = document.getElementById('engine-select').value;
             const lang = document.getElementById('lang-select').value;
             isProRunning = true;
@@ -381,30 +377,22 @@
 
             if (engine === 'local-whisper') {
                 startLocalWhisper(lang);
-            } else if (engine === 'web-speech') {
-                startWebSpeech(lang);
             } else {
                 startGroqWhisper(lang);
             }
         }
 
-        let whisperInstance = null;
         async function startLocalWhisper(lang) {
-            log("[Local AI] 엔진 초기화 중... (최초 실행 시 시간이 걸립니다)");
+            log("[로컬 AI] 엔진 초기화 시작...");
             document.getElementById('model-loading').style.display = 'block';
-            
             try {
                 if (!whisperInstance) {
                     whisperInstance = await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
-                        progress_callback: (p) => {
-                            if (p.status === 'progress') {
-                                document.getElementById('model-loading-fill').style.width = p.progress + "%";
-                            }
-                        }
+                        progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
                     });
                 }
                 document.getElementById('model-loading').style.display = 'none';
-                log("[Local AI] 엔진 로딩 완료! 자막 생성을 시작합니다.");
+                log("[로컬 AI] 준비 완료. 마이크 감지 중...");
 
                 proInterval = setInterval(async () => {
                     if (!isProRunning) return;
@@ -414,15 +402,10 @@
                     recorder.onstop = async () => {
                         const blob = new Blob(chunks, { type: 'audio/webm' });
                         const audioData = await blob.arrayBuffer();
-                        const audioCtx = new AudioContext({ sampleRate: 16000 });
-                        const decoded = await audioCtx.decodeAudioData(audioData);
+                        const internalAudioCtx = new AudioContext({ sampleRate: 16000 });
+                        const decoded = await internalAudioCtx.decodeAudioData(audioData);
                         const audioFloat32 = decoded.getChannelData(0);
-
-                        const result = await whisperInstance(audioFloat32, {
-                            language: lang === 'auto' ? null : lang,
-                            task: 'transcribe',
-                        });
-
+                        const result = await whisperInstance(audioFloat32, { language: lang === 'auto' ? null : lang, task: 'transcribe' });
                         const cleaned = cleanText(result.text);
                         if (cleaned) {
                             const el = document.getElementById('youtube-text');
@@ -430,47 +413,16 @@
                             localStorage.setItem('vlive_transcript', el.innerText);
                             document.getElementById('youtube-scroll').scrollTop = 999999;
                         }
-                        await audioCtx.close();
+                        await internalAudioCtx.close();
                     };
                     recorder.start();
                     setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 4000);
                 }, 4500);
-
-            } catch (e) {
-                log("Local AI 에러: " + e.message, true);
-                document.getElementById('model-loading').style.display = 'none';
-            }
-        }
-
-        function startWebSpeech(lang) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return log("지원 안 함", true);
-            recognition = new SpeechRecognition();
-            recognition.continuous = true; recognition.interimResults = true;
-            recognition.lang = lang === 'ko' ? 'ko-KR' : (lang === 'en' ? 'en-US' : navigator.language);
-            recognition.onresult = (event) => {
-                let interim = ''; let final = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                    else interim += event.results[i][0].transcript;
-                }
-                document.getElementById('interim-text').innerText = interim;
-                if (final) {
-                    const cleaned = cleanText(final);
-                    if(cleaned) {
-                        const el = document.getElementById('youtube-text');
-                        el.innerText += cleaned + " ";
-                        localStorage.setItem('vlive_transcript', el.innerText);
-                        document.getElementById('youtube-scroll').scrollTop = 999999;
-                    }
-                }
-            };
-            recognition.onend = () => { if (isProRunning) { try { recognition.start(); } catch(e){} } };
-            try { recognition.start(); log("[일반 모드] 가동 성공"); } catch(e) {}
+            } catch (e) { log("로컬 에러: " + e.message, true); }
         }
 
         function startGroqWhisper(lang) {
-            log("[Premium] 고정밀 엔진 가동");
+            log("[고정밀 Pro] 클라우드 엔진 가동");
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
                 const recorder = new MediaRecorder(stream);
@@ -504,7 +456,6 @@
 
         function stopProRec() { 
             isProRunning = false; clearInterval(proInterval);
-            if (recognition) { recognition.onend = null; try { recognition.stop(); } catch(e) {} }
             document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true;
             document.getElementById('interim-text').innerText = ""; setStatus("IDLE", false);
             document.getElementById('model-loading').style.display = 'none';
@@ -523,9 +474,8 @@
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, question }) });
                 const data = await res.json();
-                const result = data.result || "결과 오류";
-                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${result}</div>`;
-                else aiArea.innerHTML = result;
+                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${data.result}</div>`;
+                else aiArea.innerHTML = data.result;
                 aiArea.scrollTop = aiArea.scrollHeight;
             } catch (e) { log("AI 오류", true); }
         }
