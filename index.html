@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption | AI 실시간 자막</title>
+    <title>V-Live Caption | 고정밀 AI 자막</title>
     <style>
         :root {
             --primary: #4CAF50;
@@ -137,6 +137,17 @@
             line-height: 1.5;
         }
 
+        .error-log {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
         footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
     </style>
 </head>
@@ -152,11 +163,11 @@
         <div class="nav-item" onclick="switchMode('youtube')">📺 2. 고정밀 자막(Pro)</div>
     </nav>
 
-    <!-- 모드 2: 고정밀 자막 -->
     <div id="youtube-container" class="container">
-        <div class="info-banner">
-            ✨ <strong>Pro 모드:</strong> 이제 노래와 시끄러운 영상도 정확하게 잡아냅니다! (Groq AI 가동)
+        <div class="info-banner" id="y-info">
+            ✨ <strong>Pro 모드:</strong> 3초마다 AI가 자막을 업데이트합니다. 유튜브 소리를 크게 켭니다!
         </div>
+        <div id="pro-error" class="error-log"></div>
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">📺 실시간 고정밀 자막</div>
@@ -164,10 +175,7 @@
                     <div id="youtube-text" style="color:#FFEB3B; font-weight:bold;"></div>
                 </div>
             </div>
-            <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header" style="color: #d1b3ff;">🧠 AI 요약</div>
-                <div class="scroll-area" id="youtube-ai"></div>
-            </div>
+            <div class="card" style="border-color: var(--ai-accent);"><div class="card-header">🧠 AI 요약</div><div class="scroll-area" id="youtube-ai"></div></div>
         </div>
         <div class="controls">
             <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 시작</button>
@@ -176,16 +184,12 @@
         </div>
     </div>
 
-    <!-- 모드 1: 내 목소리 -->
     <div id="mic-container" class="container active">
-        <div class="info-banner">🎙️ 내 목소리를 AI가 기록하고 해석합니다.</div>
+        <div class="info-banner">🎙️ 일반 인식 모드입니다.</div>
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">📝 실시간 기록</div>
-                <div id="mic-scroll" class="scroll-area">
-                    <span id="mic-final"></span>
-                    <span id="mic-interim" style="color:gray;"></span>
-                </div>
+                <div class="card-header">📝 기록</div>
+                <div id="mic-scroll" class="scroll-area"><span id="mic-final"></span><span id="mic-interim" style="color:gray;"></span></div>
             </div>
             <div class="card"><div class="card-header">🧠 AI 해석</div><div class="scroll-area" id="mic-ai"></div></div>
         </div>
@@ -209,7 +213,6 @@
             stopProRec();
         }
 
-        // --- 일반 인식 (모드 1) ---
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         function startRec(mode) {
             recognition = new SpeechRecognition();
@@ -236,13 +239,14 @@
         }
         function stopRec() { if(recognition) recognition.stop(); document.querySelectorAll('.btn-start').forEach(b => b.disabled = false); document.querySelectorAll('.btn-stop').forEach(b => b.disabled = true); }
 
-        // --- Pro 인식 (모드 2) ---
         async function startProRec() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 isProRunning = true;
                 document.getElementById('pro-start').disabled = true;
                 document.getElementById('pro-stop').disabled = false;
+                document.getElementById('pro-error').style.display = 'none';
+                document.getElementById('y-info').innerHTML = "🟢 <strong>실시간 분석 중...</strong> (3초 뒤 첫 자막이 뜹니다)";
 
                 proInterval = setInterval(async () => {
                     if (!isProRunning) return;
@@ -257,20 +261,23 @@
                         formData.append('language', 'ko');
                         try {
                             const res = await fetch('/api/stt', { method: 'POST', body: formData });
+                            if (!res.ok) throw new Error("서버 에러: " + res.status);
                             const data = await res.json();
                             if (data.text) {
                                 document.getElementById('youtube-text').innerHTML += data.text + " ";
-                                const scroll = document.getElementById('youtube-scroll');
-                                scroll.scrollTop = scroll.scrollHeight;
+                                document.getElementById('youtube-scroll').scrollTop = document.getElementById('youtube-scroll').scrollHeight;
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            document.getElementById('pro-error').style.display = 'block';
+                            document.getElementById('pro-error').innerText = "⚠️ 자막 전송 실패: " + e.message + " (API 키 설정을 확인하세요)";
+                        }
                     };
                     recorder.start();
                     setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
                 }, 3500);
-            } catch (err) { alert("마이크 권한 필요"); }
+            } catch (err) { alert("마이크 권한을 허용해주세요!"); }
         }
-        function stopProRec() { isProRunning = false; clearInterval(proInterval); document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true; }
+        function stopProRec() { isProRunning = false; clearInterval(proInterval); document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true; document.getElementById('y-info').innerText = "⚪ 중지됨"; }
 
         async function callAI(mode) {
             const text = mode === 'mic' ? document.getElementById('mic-final').innerText : document.getElementById('youtube-text').innerText;
