@@ -66,12 +66,10 @@
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
 
-        /* 장치 선택기 */
         .selector-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #444; }
         select { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 6px; width: 100%; margin-top: 10px; font-family: inherit; }
 
-        /* 디버그 로그 창 */
-        #debug-log { background: #000; color: #0f0; font-family: monospace; font-size: 0.7rem; padding: 10px; height: 80px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; margin-top: 10px; }
+        #debug-log { background: #000; color: #0f0; font-family: monospace; font-size: 0.75rem; padding: 10px; height: 100px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; margin-top: 10px; }
 
         footer { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
     </style>
@@ -92,14 +90,12 @@
         <div class="nav-item" onclick="switchMode('mic')">🎙️ 1. 일반 기록</div>
     </nav>
 
-    <!-- Pro 모드 (메인) -->
     <div id="youtube-container" class="container active">
         <div class="selector-box">
-            <strong>🎤 1단계: 장치 선택 (필수!)</strong>
+            <strong>🎤 장치 선택</strong>
             <select id="device-select" onchange="initAudio()">
                 <option value="">마이크 목록을 불러오는 중...</option>
             </select>
-            <p style="font-size:0.75rem; color:#888; margin:8px 0 0 0;">반드시 <b>CABLE Output</b>을 선택해야 유튜브 소리가 들어옵니다.</p>
         </div>
 
         <div class="content-grid">
@@ -109,10 +105,7 @@
                     <div id="youtube-text" style="color:#FFEB3B; font-weight:bold;"></div>
                 </div>
             </div>
-            <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header">🧠 AI 요약</div>
-                <div id="youtube-ai" class="scroll-area" style="font-size: 1rem;"></div>
-            </div>
+            <div class="card" style="border-color: var(--ai-accent);"><div class="card-header">🧠 AI 요약</div><div class="scroll-area" id="youtube-ai" style="font-size:1rem;"></div></div>
         </div>
 
         <div class="controls">
@@ -121,58 +114,42 @@
             <button onclick="callAI('youtube')" class="btn btn-ai">✨ 요약하기</button>
         </div>
 
-        <div id="debug-log">시스템 준비 완료...</div>
+        <div id="debug-log">시스템 대기 중...</div>
     </div>
 
-    <!-- 일반 모드 -->
     <div id="mic-container" class="container">
-        <div class="info-banner">일반 내 목소리 기록 모드입니다.</div>
+        <div class="info-banner">일반 모드입니다.</div>
         <div class="content-grid">
             <div class="card"><div class="card-header">📝 기록</div><div id="mic-scroll" class="scroll-area"><span id="mic-final"></span></div></div>
             <div class="card"><div class="card-header">🧠 해석</div><div id="mic-ai" class="scroll-area"></div></div>
         </div>
-        <div class="controls">
-            <button onclick="startRec()" id="mic-start" class="btn btn-start">🎙️ 시작</button>
-            <button onclick="stopRec()" id="mic-stop" class="btn btn-stop" disabled>■ 중지</button>
-        </div>
     </div>
 
     <script>
-        let recognition = null;
         let proInterval = null;
         let isProRunning = false;
         let audioContext = null;
         let stream = null;
 
-        const log = (msg) => {
+        const log = (msg, isError = false) => {
             const box = document.getElementById('debug-log');
-            box.innerHTML += `> ${msg}<br>`;
+            const color = isError ? 'red' : '#0f0';
+            box.innerHTML += `<span style="color:${color}">> ${msg}</span><br>`;
             box.scrollTop = box.scrollHeight;
         };
 
-        // 장치 목록 가져오기 및 오디오 초기화
         async function initAudio() {
             try {
                 if (audioContext) audioContext.close();
                 const deviceId = document.getElementById('device-select').value;
-                
-                // [수정] 자동 볼륨 조절(AGC) 및 노이즈 제거 기능을 꺼서 감도 저하 방지
-                const constraints = {
-                    audio: {
-                        deviceId: deviceId ? { exact: deviceId } : undefined,
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false // 이게 범인입니다!
-                    }
-                };
+                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
-                // 장치 목록 업데이트 (최초 1회 및 권한 획득 후)
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
-                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '알 수 없는 마이크'}</option>`).join('');
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
@@ -190,8 +167,8 @@
                     if(audioContext.state !== 'closed') requestAnimationFrame(draw);
                 }
                 draw();
-                log("장치 연결 성공: " + (mics.find(m => m.deviceId === deviceId)?.label || "기본값"));
-            } catch(e) { log("장치 연결 실패: " + e.message); }
+                log("마이크 연결됨: " + (mics.find(m => m.deviceId === deviceId)?.label || "기본값"));
+            } catch(e) { log("마이크 에러: " + e.message, true); }
         }
         initAudio();
 
@@ -200,7 +177,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(mode + '-container').classList.add('active');
             event.currentTarget.classList.add('active');
-            stopRec(); stopProRec();
+            stopProRec();
         }
 
         async function startProRec() {
@@ -208,7 +185,7 @@
             isProRunning = true;
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
-            log("🚀 Pro 자막 세션 시작...");
+            log("🚀 Pro 자막 세션 시작 (3초 단위)...");
 
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
@@ -217,22 +194,28 @@
                 recorder.ondataavailable = e => chunks.push(e.data);
                 recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'audio/webm' });
-                    if (blob.size < 1000) { log("⚠️ 소리 데이터가 너무 작음 (무음)"); return; }
+                    if (blob.size < 2000) { log("⚠️ 무음 감지 (데이터 부족)"); return; }
                     
                     const formData = new FormData();
                     formData.append('file', blob, 'audio.webm');
                     formData.append('model', 'whisper-large-v3');
                     formData.append('language', 'ko');
                     
-                    log(`☁️ 서버로 전송 중... (${Math.round(blob.size/1024)}KB)`);
+                    log(`📤 서버로 전송 중 (${Math.round(blob.size/1024)}KB)...`);
                     try {
                         const res = await fetch('/api/stt', { method: 'POST', body: formData });
                         const data = await res.json();
-                        if (data.text) {
+                        
+                        if (res.ok && data.text) {
+                            log(`📥 수신 완료: "${data.text.substring(0, 15)}..."`);
                             document.getElementById('youtube-text').innerHTML += data.text + " ";
                             document.getElementById('youtube-scroll').scrollTop = 99999;
+                        } else if (data.error) {
+                            log(`❌ 서버 에러: ${data.error}`, true);
+                        } else {
+                            log(`❌ 서버 응답이 비어있음 (코드: ${res.status})`, true);
                         }
-                    } catch (e) { log("❌ 전송 실패: " + e.message); }
+                    } catch (e) { log("❌ 전송 실패 (네트워크 확인)", true); }
                 };
                 recorder.start();
                 setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
@@ -256,12 +239,8 @@
                 const data = await res.json();
                 document.getElementById('youtube-ai').innerHTML = data.result || data.error;
                 log("✅ 요약 완료");
-            } catch (e) { log("❌ 요약 실패"); }
+            } catch (e) { log("❌ 요약 실패", true); }
         }
-
-        // 일반 모드 (간략화)
-        function startRec() { alert("Pro 모드를 먼저 테스트해주세요!"); }
-        function stopRec() {}
     </script>
 </body>
 </html>
