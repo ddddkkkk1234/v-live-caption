@@ -3,149 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption | AI 실시간 자막</title>
+    <title>V-Live Caption Pro | Enterprise AI 자막</title>
     <style>
         :root {
-            --primary: #4CAF50;
-            --ai-accent: #8E44AD;
-            --danger: #f44336;
-            --bg-color: #121212;
-            --surface: #1e1e1e;
-            --text-main: #ffffff;
-            --text-muted: #aaaaaa;
-            --nav-bg: #252525;
+            --primary: #00E676;
+            --primary-dark: #00C853;
+            --ai-accent: #D1C4E9;
+            --ai-glow: #7C4DFF;
+            --danger: #FF5252;
+            --bg-dark: #0A0A0B;
+            --surface: #161618;
+            --surface-light: #222225;
+            --text-main: #F5F5F7;
+            --text-muted: #86868B;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+            /* Custom Variables */
+            --caption-size: 1.4rem;
+            --caption-color: #FFEB3B;
+            --caption-opacity: 1;
         }
+
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 
         body {
             font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-            background-color: var(--bg-color);
+            background-color: var(--bg-dark);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
             min-height: 100vh;
             margin: 0;
+            overflow-x: hidden;
         }
 
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.8rem 5%;
-            background-color: var(--surface);
-            border-bottom: 1px solid #333;
+            padding: 1rem 5%;
+            background-color: rgba(10, 10, 11, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
+
+        .brand { display: flex; align-items: center; gap: 10px; }
+        .brand h1 { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px; margin: 0; background: linear-gradient(90deg, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold; background: var(--glass); border: 1px solid var(--border); display: flex; align-items: center; gap: 5px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s; }
+        .status-dot.active { background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: pulse 1.5s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         .volume-meter {
-            background: #000;
-            padding: 5px 15px;
-            border-radius: 20px;
+            background: var(--surface);
+            padding: 6px 14px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            border: 1px solid #333;
+            gap: 12px;
+            border: 1px solid var(--border);
         }
+        .v-bar { width: 60px; height: 4px; background: #2A2A2E; border-radius: 2px; overflow: hidden; }
+        .v-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), #81C784); transition: width 0.05s ease-out; }
 
-        .v-bar { width: 80px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
-        .v-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.1s; }
-
-        nav { display: flex; background-color: var(--nav-bg); padding: 0 5%; gap: 10px; }
-        .nav-item { padding: 1.2rem 1rem; cursor: pointer; font-weight: bold; color: var(--text-muted); border-bottom: 4px solid transparent; transition: all 0.2s; }
+        nav { display: flex; background: var(--bg-dark); padding: 0 5%; gap: 20px; border-bottom: 1px solid var(--border); }
+        .nav-item { padding: 1rem 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent; transition: all 0.3s; }
         .nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-        .container { flex: 1; display: none; flex-direction: column; padding: 1rem; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; gap: 1rem; }
+        .container { flex: 1; display: none; flex-direction: column; padding: 1.5rem 5%; max-width: 1400px; margin: 0 auto; width: 100%; gap: 1.5rem; }
         .container.active { display: flex; }
 
-        .card { background: var(--surface); border-radius: 16px; border: 1px solid #333; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; }
-        .card-header { padding: 1rem 1.2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid #333; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .selector-box { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 1rem; 
+            background: var(--surface); 
+            padding: 1.2rem; 
+            border-radius: 16px; 
+            border: 1px solid var(--border);
+        }
+        .selector-item { display: flex; flex-direction: column; gap: 8px; }
+        .selector-item label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        select, input[type="range"], input[type="color"] { 
+            background: var(--surface-light); 
+            color: var(--text-main); 
+            border: 1px solid var(--border); 
+            padding: 8px; 
+            border-radius: 8px; 
+            font-size: 0.8rem; 
+            outline: none;
+            width: 100%;
+        }
 
-        .scroll-area { flex: 1; padding: 1.2rem; overflow-y: auto; height: 40vh; line-height: 1.8; font-size: 1.3rem; }
+        .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; flex: 1; min-height: 500px; }
+        @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
+
+        .card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .card-header { padding: 1.2rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card-header h3 { margin: 0; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+
+        .scroll-area { 
+            flex: 1; 
+            padding: 1.5rem; 
+            overflow-y: auto; 
+            height: 55vh; 
+            line-height: 1.6; 
+            word-break: keep-all;
+            background: radial-gradient(circle at top right, rgba(0,230,118,0.02), transparent);
+        }
         
-        .controls { display: flex; gap: 12px; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
-        .btn { padding: 0.8rem 1.5rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
-        .btn-start { background: var(--primary); color: white; }
-        .btn-stop { background: var(--danger); color: white; }
-        .btn-ai { background: var(--ai-accent); color: white; }
-        .btn-pip { background: #444; color: white; font-size: 0.75rem; padding: 5px 10px; }
+        #youtube-text { 
+            font-size: var(--caption-size); 
+            color: var(--caption-color); 
+            opacity: var(--caption-opacity);
+            font-weight: 700; 
+            transition: all 0.2s; 
+        }
+        #youtube-ai { font-size: 0.95rem; color: #D1D1D6; line-height: 1.7; }
 
-        .selector-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #444; display: flex; gap: 10px; flex-wrap: wrap; }
-        .selector-item { flex: 1; min-width: 150px; }
-        select { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 6px; width: 100%; margin-top: 5px; font-family: inherit; }
+        .controls { display: flex; gap: 1rem; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
+        .btn { 
+            padding: 0.8rem 1.5rem; 
+            border-radius: 12px; 
+            border: none; 
+            font-weight: 700; 
+            font-size: 0.9rem;
+            cursor: pointer; 
+            transition: all 0.2s; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        #debug-log { background: #000; color: #0f0; font-family: monospace; font-size: 0.75rem; padding: 10px; height: 100px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; margin-top: 10px; }
+        .btn-start { background: var(--primary); color: #000; }
+        .btn-stop { background: var(--surface-light); color: var(--danger); border: 1px solid rgba(255,82,82,0.1); }
+        .btn-ai { background: linear-gradient(135deg, #7C4DFF, #D1C4E9); color: #fff; }
+        .btn-download { background: var(--surface-light); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-pip { background: var(--surface-light); color: var(--text-main); font-size: 0.65rem; padding: 5px 10px; border: 1px solid var(--border); }
 
-        footer { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
-        
+        #debug-log { 
+            background: #000; 
+            color: #4CAF50; 
+            font-family: monospace; 
+            font-size: 0.65rem; 
+            padding: 10px; 
+            height: 100px; 
+            overflow-y: auto; 
+            border: 1px solid var(--border); 
+            border-radius: 10px; 
+            opacity: 0.6;
+        }
+
         #pip-canvas { display: none; }
         #pip-video { display: none; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1 style="font-size: 1.2rem; margin:0;">🚀 V-Live Caption Pro</h1>
+        <div class="brand">
+            <h1>V-Live Caption <span style="color:var(--primary); font-weight:400;">PRO</span></h1>
+            <div class="status-badge">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">SYSTEM READY</span>
+            </div>
+        </div>
         <div class="volume-meter">
-            <span style="font-size: 0.7rem;">감도:</span>
+            <span style="font-size: 0.6rem; font-weight:700; color:var(--text-muted);">GAIN</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
-            <span id="v-label" style="font-size: 0.7rem;">0%</span>
+            <span id="v-label" style="font-size: 0.6rem; font-weight:800; min-width:25px;">0%</span>
         </div>
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('youtube')">📺 실시간 자막</div>
-        <div class="nav-item" onclick="switchMode('mic')">🎙️ 일반 기록</div>
+        <div class="nav-item active" onclick="switchMode('youtube')">LIVE SESSION</div>
+        <div class="nav-item" onclick="switchMode('mic')">HISTORY</div>
     </nav>
 
     <div id="youtube-container" class="container active">
+        <!-- Configuration Area -->
         <div class="selector-box">
             <div class="selector-item">
-                <strong>🎤 마이크 선택</strong>
-                <select id="device-select" onchange="initAudio()">
-                    <option value="">불러오는 중...</option>
-                </select>
+                <label>Audio Device</label>
+                <select id="device-select" onchange="initAudio()"><option value="">Detecting...</option></select>
             </div>
             <div class="selector-item">
-                <strong>⚙️ STT 엔진</strong>
+                <label>STT Engine</label>
                 <select id="engine-select">
-                    <option value="web-speech">Web Speech API (무료/무제한)</option>
-                    <option value="groq">Groq Whisper (고정밀/유료)</option>
+                    <option value="web-speech">Native Web (Free)</option>
+                    <option value="groq">Groq Whisper (Pro)</option>
                 </select>
             </div>
             <div class="selector-item">
-                <strong>🌐 언어 설정</strong>
+                <label>Language</label>
                 <select id="lang-select">
-                    <option value="ko-KR">한국어 (KO)</option>
-                    <option value="en-US">영어 (EN)</option>
-                    <option value="auto">자동 감지</option>
+                    <option value="ko-KR">Korean (KO)</option>
+                    <option value="en-US">English (EN)</option>
+                    <option value="auto">Auto Detect</option>
                 </select>
+            </div>
+            <div class="selector-item">
+                <label>Font Size</label>
+                <input type="range" id="font-size-slider" min="1" max="3" step="0.1" value="1.4" oninput="updateStyle()">
+            </div>
+            <div class="selector-item">
+                <label>Text Color</label>
+                <input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()">
             </div>
         </div>
 
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
-                    <span>📺 실시간 자막 화면</span>
-                    <button id="pip-btn" onclick="togglePIP()" class="btn btn-pip">📺 PIP 모드</button>
+                    <h3><span>📺</span> Transcript</h3>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="clearTranscript()" class="btn btn-pip">CLEAR</button>
+                        <button onclick="togglePIP()" class="btn btn-pip">PIP MODE</button>
+                    </div>
                 </div>
-                <div id="youtube-scroll" class="scroll-area" style="background:#000;">
-                    <div id="youtube-text" style="color:#FFEB3B; font-weight:bold;"></div>
+                <div id="youtube-scroll" class="scroll-area">
+                    <div id="youtube-text"></div>
                 </div>
             </div>
-            <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header">🧠 AI 실시간 요약</div>
-                <div class="scroll-area" id="youtube-ai" style="font-size:1rem;"></div>
+            <div class="card" style="border-color: rgba(124, 77, 255, 0.2);">
+                <div class="card-header"><h3><span>🧠</span> Intelligence</h3></div>
+                <div class="scroll-area" id="youtube-ai"></div>
             </div>
         </div>
 
         <div class="controls">
-            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 시작</button>
-            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 중지</button>
-            <button onclick="callAI()" class="btn btn-ai">✨ 요약하기</button>
+            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 START</button>
+            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ STOP</button>
+            <button onclick="callAI()" class="btn btn-ai">✨ SUMMARIZE</button>
+            <button onclick="downloadTranscript()" class="btn btn-download">📥 DOWNLOAD TXT</button>
         </div>
 
-        <div id="debug-log">시스템 준비 완료...</div>
+        <div id="debug-log">Ready for secure, private captioning.</div>
     </div>
 
-    <!-- PIP용 요소 -->
     <canvas id="pip-canvas" width="800" height="200"></canvas>
     <video id="pip-video" autoplay playsinline muted></video>
 
@@ -155,30 +258,94 @@
         let audioContext = null;
         let stream = null;
         let recognition = null;
+        let lastLoggedText = ""; // Deduplication
         
         const pipCanvas = document.getElementById('pip-canvas');
         const pipVideo = document.getElementById('pip-video');
         const pipCtx = pipCanvas.getContext('2d');
 
+        // Initial Load from LocalStorage
+        window.onload = () => {
+            const saved = localStorage.getItem('vlive_transcript');
+            if(saved) document.getElementById('youtube-text').innerText = saved;
+            
+            const savedSize = localStorage.getItem('vlive_font_size');
+            if(savedSize) {
+                document.getElementById('font-size-slider').value = savedSize;
+                updateStyle();
+            }
+            const savedColor = localStorage.getItem('vlive_text_color');
+            if(savedColor) {
+                document.getElementById('text-color-picker').value = savedColor;
+                updateStyle();
+            }
+        };
+
+        function updateStyle() {
+            const size = document.getElementById('font-size-slider').value + "rem";
+            const color = document.getElementById('text-color-picker').value;
+            document.documentElement.style.setProperty('--caption-size', size);
+            document.documentElement.style.setProperty('--caption-color', color);
+            localStorage.setItem('vlive_font_size', document.getElementById('font-size-slider').value);
+            localStorage.setItem('vlive_text_color', color);
+        }
+
+        function clearTranscript() {
+            if(confirm("기록을 모두 삭제할까요?")) {
+                document.getElementById('youtube-text').innerText = "";
+                localStorage.removeItem('vlive_transcript');
+                log("Transcript cleared.");
+            }
+        }
+
+        function downloadTranscript() {
+            const text = document.getElementById('youtube-text').innerText;
+            if(!text) return alert("저장할 내용이 없습니다.");
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `V-Live-Caption-${new Date().toISOString().slice(0,10)}.txt`;
+            a.click();
+            log("Transcript exported.");
+        }
+
         const log = (msg, isError = false) => {
             const box = document.getElementById('debug-log');
-            const color = isError ? '#ff5252' : '#0f0';
-            box.innerHTML += `<span style="color:${color}">> ${msg}</span><br>`;
+            const color = isError ? '#FF5252' : '#00E676';
+            box.innerHTML += `<span style="color:${color}">[${new Date().toLocaleTimeString()}] ${msg}</span><br>`;
             box.scrollTop = box.scrollHeight;
         };
+
+        const setStatus = (status, active = false) => {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            text.innerText = status.toUpperCase();
+            if(active) dot.classList.add('active'); else dot.classList.remove('active');
+        };
+
+        // Cleaning Utility (Smart Deduplication)
+        function cleanText(text) {
+            const noise = ["감사합니다", "thank you", "어..", "음..", "어..."];
+            let cleaned = text.trim();
+            if(noise.some(n => cleaned.toLowerCase() === n)) return "";
+            if(cleaned === lastLoggedText) return ""; // Simple immediate duplicate filter
+            lastLoggedText = cleaned;
+            return cleaned;
+        }
 
         async function initAudio() {
             try {
                 if (audioContext) audioContext.close();
                 const deviceId = document.getElementById('device-select').value;
-                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined } };
+                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: true } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
-                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || 'MIC'}</option>`).join('');
 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
@@ -190,40 +357,40 @@
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 2.5);
+                    let avg = Math.round((sum / data.length) * 3.5); 
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
-                    
                     updatePipCanvas();
                     if(audioContext.state !== 'closed') requestAnimationFrame(draw);
                 }
                 draw();
-                log("마이크 활성화됨");
-            } catch(e) { log("마이크 에러: " + e.message, true); }
+                setStatus("READY", false);
+            } catch(e) { log("MIC Error: " + e.message, true); }
         }
         initAudio();
 
         function updatePipCanvas() {
             pipCtx.fillStyle = "black";
             pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
-            pipCtx.fillStyle = "#FFEB3B";
-            pipCtx.font = "bold 40px Pretendard, sans-serif";
+            pipCtx.fillStyle = document.getElementById('text-color-picker').value;
+            const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 30;
+            pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`;
             pipCtx.textAlign = "center";
             const text = document.getElementById('youtube-text').innerText;
-            const lastWords = text.split(' ').slice(-12).join(' ');
+            const words = text.split(' ');
+            const lastWords = words.slice(-8).join(' ');
             pipCtx.fillText(lastWords, pipCanvas.width/2, pipCanvas.height/2 + 15);
         }
 
         async function togglePIP() {
             try {
-                if (document.pictureInPictureElement) {
-                    await document.exitPictureInPicture();
-                } else {
+                if (document.pictureInPictureElement) await document.exitPictureInPicture();
+                else {
                     if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream();
                     await pipVideo.play();
                     await pipVideo.requestPictureInPicture();
                 }
-            } catch (e) { log("PIP 에러: " + e.message, true); }
+            } catch (e) { log("PIP Error: " + e.message, true); }
         }
 
         function switchMode(mode) {
@@ -237,28 +404,18 @@
             if (!stream) await initAudio();
             const engine = document.getElementById('engine-select').value;
             const lang = document.getElementById('lang-select').value;
-            
             isProRunning = true;
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
-            
-            log(`🚀 자막 생성 시작 (엔진: ${engine}, 언어: ${lang})`);
-
-            if (engine === 'web-speech') {
-                startWebSpeech(lang);
-            } else {
-                startGroqWhisper(lang);
-            }
+            setStatus("LIVE", true);
+            log(`STT Engine [${engine}] active.`);
+            if (engine === 'web-speech') startWebSpeech(lang);
+            else startGroqWhisper(lang);
         }
 
         function startWebSpeech(lang) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                log("❌ 이 브라우저는 Web Speech API를 지원하지 않습니다.", true);
-                stopProRec();
-                return;
-            }
-
+            if (!SpeechRecognition) return log("Web Speech API not supported.", true);
             recognition = new SpeechRecognition();
             recognition.continuous = true;
             recognition.interimResults = true;
@@ -267,21 +424,19 @@
             recognition.onresult = (event) => {
                 let finalTranscript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    }
+                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
                 }
                 if (finalTranscript) {
-                    document.getElementById('youtube-text').innerHTML += finalTranscript + " ";
-                    document.getElementById('youtube-scroll').scrollTop = 99999;
+                    const cleaned = cleanText(finalTranscript);
+                    if(cleaned) {
+                        const textEl = document.getElementById('youtube-text');
+                        textEl.innerText += cleaned + " ";
+                        localStorage.setItem('vlive_transcript', textEl.innerText);
+                        document.getElementById('youtube-scroll').scrollTop = 999999;
+                    }
                 }
             };
-
-            recognition.onend = () => {
-                if (isProRunning) recognition.start();
-            };
-
-            recognition.onerror = (e) => log("WebSpeech 에러: " + e.error, true);
+            recognition.onend = () => { if (isProRunning) recognition.start(); };
             recognition.start();
         }
 
@@ -294,20 +449,20 @@
                 recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'audio/webm' });
                     if (blob.size < 2500) return;
-                    
                     const formData = new FormData();
                     formData.append('file', blob, 'audio.webm');
                     formData.append('model', 'whisper-large-v3');
                     if (lang !== 'auto') formData.append('language', lang.split('-')[0]);
-                    
                     try {
                         const res = await fetch('/api/stt', { method: 'POST', body: formData });
                         const data = await res.json();
                         if (res.ok && data.text) {
-                            const txt = data.text.trim();
-                            if (txt && !txt.includes("감사합니다") && !txt.toLowerCase().includes("thank you")) {
-                                document.getElementById('youtube-text').innerHTML += txt + " ";
-                                document.getElementById('youtube-scroll').scrollTop = 99999;
+                            const cleaned = cleanText(data.text);
+                            if (cleaned) {
+                                const textEl = document.getElementById('youtube-text');
+                                textEl.innerText += cleaned + " ";
+                                localStorage.setItem('vlive_transcript', textEl.innerText);
+                                document.getElementById('youtube-scroll').scrollTop = 999999;
                             }
                         }
                     } catch (e) { console.error(e); }
@@ -320,25 +475,21 @@
         function stopProRec() { 
             isProRunning = false; 
             if (proInterval) clearInterval(proInterval); 
-            if (recognition) {
-                recognition.onend = null;
-                recognition.stop();
-            }
+            if (recognition) { recognition.onend = null; recognition.stop(); }
             document.getElementById('pro-start').disabled = false; 
             document.getElementById('pro-stop').disabled = true; 
-            log("⏹️ 자막 중지됨");
+            setStatus("IDLE", false);
         }
 
         async function callAI() {
             const text = document.getElementById('youtube-text').innerText;
-            if (text.length < 10) return log("⚠️ 요약할 내용이 부족합니다.", true);
-            log("🧠 AI 요약 중...");
+            if (text.length < 10) return log("Need more text for AI.", true);
+            log("AI Summarizing...");
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
                 const data = await res.json();
-                document.getElementById('youtube-ai').innerHTML = data.result || "요약 실패";
-                log("✅ 요약 완료");
-            } catch (e) { log("❌ 요약 실패", true); }
+                document.getElementById('youtube-ai').innerHTML = data.result || "AI Error.";
+            } catch (e) { log("AI Error.", true); }
         }
     </script>
 </body>
