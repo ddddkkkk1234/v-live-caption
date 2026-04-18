@@ -18,7 +18,6 @@
             --text-muted: #86868B;
             --glass: rgba(255, 255, 255, 0.03);
             --border: rgba(255, 255, 255, 0.1);
-            /* 사용자 설정 변수 */
             --caption-size: 1.4rem;
             --caption-color: #FFEB3B;
             --caption-opacity: 1;
@@ -112,7 +111,7 @@
             display: none; 
         }
 
-        .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; flex: 1; min-height: 500px; }
+        .content-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 1.5rem; flex: 1; min-height: 550px; }
         @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
 
         .card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -129,51 +128,28 @@
             background: radial-gradient(circle at top right, rgba(0,230,118,0.02), transparent);
         }
         
-        #youtube-text { 
-            font-size: var(--caption-size); 
-            color: var(--caption-color); 
-            opacity: var(--caption-opacity);
-            font-weight: 700; 
-            transition: all 0.2s; 
-        }
+        #youtube-text { font-size: var(--caption-size); color: var(--caption-color); opacity: var(--caption-opacity); font-weight: 700; transition: all 0.2s; }
         .interim { color: var(--text-muted); font-style: italic; }
 
-        #youtube-ai { font-size: 0.95rem; color: #D1D1D6; line-height: 1.7; }
+        /* 채팅 스타일 UI */
+        .chat-container { display: flex; flex-direction: column; height: 100%; }
+        #youtube-ai { flex: 1; font-size: 0.95rem; color: #D1D1D6; line-height: 1.7; padding-bottom: 10px; }
+        .chat-input-box { display: flex; gap: 8px; padding: 12px; background: var(--surface-light); border-top: 1px solid var(--border); }
+        .chat-input-box input { flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }
+        .chat-input-box input:focus { border-color: var(--primary); }
+        .btn-send { background: var(--primary); color: #000; padding: 6px 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
 
         .controls { display: flex; gap: 1rem; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
-        .btn { 
-            padding: 0.85rem 1.8rem; 
-            border-radius: 14px; 
-            border: none; 
-            font-weight: 700; 
-            font-size: 0.95rem;
-            cursor: pointer; 
-            transition: all 0.2s; 
-            display: flex; 
-            align-items: center; 
-            gap: 8px;
-        }
+        .btn { padding: 0.85rem 1.8rem; border-radius: 14px; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
         .btn:active { transform: scale(0.97); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .btn-start { background: var(--primary); color: #000; }
         .btn-stop { background: var(--surface-light); color: var(--danger); border: 1px solid rgba(255,82,82,0.1); }
-        .btn-ai { background: linear-gradient(135deg, #7C4DFF, #D1C4E9); color: #fff; }
         .btn-download { background: var(--surface-light); color: var(--text-main); border: 1px solid var(--border); }
         .btn-pip { background: var(--surface-light); color: var(--text-main); font-size: 0.7rem; padding: 6px 12px; border: 1px solid var(--border); }
 
-        #debug-log { 
-            background: #000; 
-            color: #4CAF50; 
-            font-family: 'JetBrains Mono', monospace; 
-            font-size: 0.7rem; 
-            padding: 12px; 
-            height: 120px; 
-            overflow-y: auto; 
-            border: 1px solid var(--border); 
-            border-radius: 12px; 
-            opacity: 0.7;
-        }
+        #debug-log { background: #000; color: #4CAF50; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; padding: 12px; height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; opacity: 0.7; }
 
         #pip-canvas { display: none; }
         #pip-video { display: none; }
@@ -187,13 +163,10 @@
     <header>
         <div class="brand">
             <h1>V-Live Caption <span style="color:var(--primary); font-weight:400;">PRO</span></h1>
-            <div class="status-badge">
-                <div id="status-dot" class="status-dot"></div>
-                <span id="status-text">시스템 준비됨</span>
-            </div>
+            <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
         </div>
         <div class="volume-meter">
-            <span style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도 (Gain)</span>
+            <span style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도</span>
             <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
             <span id="v-label" style="font-size: 0.65rem; font-weight:800; min-width:25px;">0%</span>
         </div>
@@ -205,12 +178,11 @@
     </nav>
 
     <div id="youtube-container" class="container active">
-        <!-- 설정 영역 -->
         <div class="selector-box">
             <div class="selector-item">
                 <label>입력 장치 선택 (Input)</label>
                 <select id="device-select" onchange="initAudio()"><option value="">장치 감지 중...</option></select>
-                <span id="device-hint" class="device-hint">시스템 기본 마이크 강제 사용 중</span>
+                <span id="device-hint" class="device-hint">시스템 기본 마이크 사용 중</span>
             </div>
             <div class="selector-item">
                 <label>자막 모드 선택 (Mode)</label>
@@ -227,44 +199,38 @@
                     <option value="auto">언어 자동 감지</option>
                 </select>
             </div>
-            <div class="selector-item">
-                <label>자막 글자 크기 (Size)</label>
-                <input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()">
-            </div>
-            <div class="selector-item">
-                <label>자막 글자 색상 (Color)</label>
-                <input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()">
-            </div>
+            <div class="selector-item"><label>글자 크기</label><input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()"></div>
+            <div class="selector-item"><label>글자 색상</label><input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()"></div>
         </div>
 
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
-                    <h3><span>📺</span> 실시간 자막 피드 (Transcript)</h3>
-                    <div style="display:flex; gap:8px;">
-                        <button onclick="clearTranscript()" class="btn btn-pip">기록 삭제</button>
-                        <button onclick="togglePIP()" class="btn btn-pip">PIP 모드 켜기</button>
-                    </div>
+                    <h3><span>📺</span> 실시간 자막</h3>
+                    <div style="display:flex; gap:8px;"><button onclick="clearTranscript()" class="btn btn-pip">초기화</button><button onclick="togglePIP()" class="btn btn-pip">PIP 모드</button></div>
                 </div>
-                <div id="youtube-scroll" class="scroll-area">
-                    <div id="youtube-text"></div>
-                    <div id="interim-text" class="interim" style="display:inline; opacity:0.6;"></div>
-                </div>
+                <div id="youtube-scroll" class="scroll-area"><div id="youtube-text"></div><div id="interim-text" class="interim" style="display:inline; opacity:0.6;"></div></div>
             </div>
             <div class="card" style="border-color: rgba(124, 77, 255, 0.3);">
-                <div class="card-header"><h3><span>🧠</span> AI 실시간 분석 (AI Intel)</h3></div>
-                <div class="scroll-area" id="youtube-ai"></div>
+                <div class="card-header"><h3><span>🧠</span> AI 스마트 어시스턴트</h3></div>
+                <div class="chat-container">
+                    <div id="youtube-ai" class="scroll-area">자막이 생성되면 AI에게 질문하거나 요약을 요청해보세요!</div>
+                    <div class="chat-input-box">
+                        <input type="text" id="chat-input" placeholder="질문을 입력하세요..." onkeypress="if(event.keyCode==13) callAI(this.value)">
+                        <button onclick="callAI(document.getElementById('chat-input').value)" class="btn-send">전송</button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="controls">
-            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작 (Start)</button>
-            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료 (Stop)</button>
-            <button onclick="callAI()" class="btn btn-ai">✨ AI 실시간 요약 (Summarize)</button>
-            <button onclick="downloadTranscript()" class="btn btn-download">📥 자막 다운로드 (.txt)</button>
+            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작</button>
+            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료</button>
+            <button onclick="callAI()" class="btn btn-download" style="background:var(--ai-glow); color:white; border:none;">✨ 자동 요약하기</button>
+            <button onclick="downloadTranscript()" class="btn btn-download">📥 TXT 다운로드</button>
         </div>
 
-        <div id="debug-log">시스템이 준비되었습니다. Chrome/Edge 환경을 권장합니다.</div>
+        <div id="debug-log">시스템 준비 완료. Chrome 환경 권장.</div>
     </div>
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
@@ -287,43 +253,30 @@
             const engine = document.getElementById('engine-select').value;
             const deviceSelect = document.getElementById('device-select');
             const deviceHint = document.getElementById('device-hint');
-
             if (engine === 'web-speech') {
                 deviceSelect.disabled = true;
                 deviceHint.style.display = 'block';
-                log("[안내] 일반 모드는 브라우저 설정의 '기본 마이크'만 사용합니다.");
                 initAudio(true); 
             } else {
                 deviceSelect.disabled = false;
                 deviceHint.style.display = 'none';
-                log("[안내] 고정밀 모드는 선택한 장치에서 직접 소리를 추출합니다.");
             }
         }
 
         window.onload = () => {
             const saved = localStorage.getItem('vlive_transcript');
             if(saved) document.getElementById('youtube-text').innerText = saved;
-            
-            const savedSize = localStorage.getItem('vlive_font_size');
-            if(savedSize) {
-                document.getElementById('font-size-slider').value = savedSize;
-                updateStyle();
-            }
-            const savedColor = localStorage.getItem('vlive_text_color');
-            if(savedColor) {
-                document.getElementById('text-color-picker').value = savedColor;
-                updateStyle();
-            }
+            updateStyle();
             updateEngineUI(); 
         };
 
         function updateStyle() {
-            const size = document.getElementById('font-size-slider').value + "rem";
-            const color = document.getElementById('text-color-picker').value;
+            const size = (localStorage.getItem('vlive_font_size') || document.getElementById('font-size-slider').value) + "rem";
+            const color = localStorage.getItem('vlive_text_color') || document.getElementById('text-color-picker').value;
             document.documentElement.style.setProperty('--caption-size', size);
             document.documentElement.style.setProperty('--caption-color', color);
-            localStorage.setItem('vlive_font_size', document.getElementById('font-size-slider').value);
-            localStorage.setItem('vlive_text_color', color);
+            document.getElementById('font-size-slider').value = parseFloat(size);
+            document.getElementById('text-color-picker').value = color;
         }
 
         function clearTranscript() {
@@ -342,10 +295,8 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const now = new Date();
-            a.download = `V-Live_자막_${now.getHours()}${now.getMinutes()}.txt`;
+            a.download = `V-Live_자막_${new Date().getHours()}${new Date().getMinutes()}.txt`;
             a.click();
-            log("자막 추출 완료.");
         }
 
         const log = (msg, isError = false) => {
@@ -377,33 +328,20 @@
                 if (audioContext) audioContext.close();
                 let deviceId = document.getElementById('device-select').value;
                 if (useDefault) deviceId = undefined; 
-
-                const constraints = { 
-                    audio: { 
-                        deviceId: deviceId ? { exact: deviceId } : undefined, 
-                        autoGainControl: false, 
-                        echoCancellation: false,
-                        noiseSuppression: false
-                    } 
-                };
+                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
                 const select = document.getElementById('device-select');
                 const currentVal = select.value;
                 select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === (useDefault ? mics[0]?.deviceId : currentVal) ? 'selected' : ''}>${m.label || '기본 마이크'}</option>`).join('');
-
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioContext.state === 'suspended') await audioContext.resume();
-
                 const source = audioContext.createMediaStreamSource(stream);
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 512;
-                analyser.smoothingTimeConstant = 0.4;
                 source.connect(analyser);
                 const data = new Uint8Array(analyser.frequencyBinCount);
-                
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
@@ -420,29 +358,19 @@
         initAudio();
 
         function updatePipCanvas() {
-            pipCtx.fillStyle = "black";
-            pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
+            pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
             pipCtx.fillStyle = document.getElementById('text-color-picker').value;
             const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
-            pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`;
-            pipCtx.textAlign = "center";
-            
-            const mainText = document.getElementById('youtube-text').innerText;
-            const interimText = document.getElementById('interim-text').innerText;
-            const fullText = (mainText + " " + interimText).trim();
-            const words = fullText.split(' ');
-            const lastWords = words.slice(-8).join(' ');
+            pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
+            const fullText = (document.getElementById('youtube-text').innerText + " " + document.getElementById('interim-text').innerText).trim();
+            const lastWords = fullText.split(' ').slice(-8).join(' ');
             pipCtx.fillText(lastWords, pipCanvas.width/2, pipCanvas.height/2 + 15);
         }
 
         async function togglePIP() {
             try {
                 if (document.pictureInPictureElement) await document.exitPictureInPicture();
-                else {
-                    if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream();
-                    await pipVideo.play();
-                    await pipVideo.requestPictureInPicture();
-                }
+                else { if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream(); await pipVideo.play(); await pipVideo.requestPictureInPicture(); }
             } catch (e) { log("PIP 에러: " + e.message, true); }
         }
 
@@ -455,90 +383,42 @@
 
         async function startProRec() {
             if (!stream) await initAudio();
-            const engine = document.getElementById('engine-select').value;
-            const lang = document.getElementById('lang-select').value;
             isProRunning = true;
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
-            setStatus("자막 캡처 중", true);
-            
-            log(`[시스템] 엔진 가동: ${engine}`);
-
-            if (engine === 'web-speech') startWebSpeech(lang);
-            else startGroqWhisper(lang);
+            setStatus("캡처 중", true);
+            if (document.getElementById('engine-select').value === 'web-speech') startWebSpeech(document.getElementById('lang-select').value);
+            else startGroqWhisper(document.getElementById('lang-select').value);
         }
 
         function startWebSpeech(lang) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                log("음성 인식을 지원하지 않는 브라우저입니다.", true);
-                stopProRec();
-                return;
-            }
-
+            if (!SpeechRecognition) return log("지원 안 함", true);
             recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true; 
+            recognition.continuous = true; recognition.interimResults = true;
             recognition.lang = lang === 'auto' ? (navigator.language || 'ko-KR') : lang;
-
-            log(`[일반 모드] 음성 인식 시작 (언어: ${recognition.lang})`);
-
             recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
-
+                let interim = ''; let final = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
-                    }
+                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                    else interim += event.results[i][0].transcript;
                 }
-
-                const interimEl = document.getElementById('interim-text');
-                interimEl.innerText = interimTranscript;
-
-                if (finalTranscript) {
-                    const cleaned = cleanText(finalTranscript);
+                document.getElementById('interim-text').innerText = interim;
+                if (final) {
+                    const cleaned = cleanText(final);
                     if(cleaned) {
-                        const textEl = document.getElementById('youtube-text');
-                        textEl.innerText += cleaned + " ";
-                        localStorage.setItem('vlive_transcript', textEl.innerText);
+                        const el = document.getElementById('youtube-text');
+                        el.innerText += cleaned + " ";
+                        localStorage.setItem('vlive_transcript', el.innerText);
                         document.getElementById('youtube-scroll').scrollTop = 999999;
-                        log(`[인식 성공] ${cleaned.substring(0, 15)}...`);
                     }
                 }
             };
-
-            recognition.onerror = (e) => {
-                if (e.error === 'no-speech') {
-                    // 침묵 타임아웃일 땐 로그만 남기고 무시 (자동 재시작 유도)
-                    console.log("[Web STT] Silence timeout.");
-                } else {
-                    log(`[일반 모드 에러] ${e.error}`, true);
-                }
-            };
-
-            recognition.onend = () => {
-                if (isProRunning) {
-                    // 침묵으로 인해 꺼진 경우 1초 뒤 즉시 재시작
-                    if(restartTimer) clearTimeout(restartTimer);
-                    restartTimer = setTimeout(() => {
-                        if(isProRunning) {
-                            try { recognition.start(); log("[시스템] 엔진 재연결됨"); } catch(err) {}
-                        }
-                    }, 1000);
-                }
-            };
-
-            try {
-                recognition.start();
-            } catch(e) { console.error(e); }
+            recognition.onend = () => { if (isProRunning) { setTimeout(() => { try { recognition.start(); } catch(e){} }, 1000); } };
+            try { recognition.start(); } catch(e) {}
         }
 
         function startGroqWhisper(lang) {
-            log("[Premium] 고정밀 엔진 가동 (3.5초 간격)");
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
                 const recorder = new MediaRecorder(stream);
@@ -557,13 +437,13 @@
                         if (res.ok && data.text) {
                             const cleaned = cleanText(data.text);
                             if (cleaned) {
-                                const textEl = document.getElementById('youtube-text');
-                                textEl.innerText += cleaned + " ";
-                                localStorage.setItem('vlive_transcript', textEl.innerText);
+                                const el = document.getElementById('youtube-text');
+                                el.innerText += cleaned + " ";
+                                localStorage.setItem('vlive_transcript', el.innerText);
                                 document.getElementById('youtube-scroll').scrollTop = 999999;
                             }
                         }
-                    } catch (e) { console.error(e); }
+                    } catch (e) {}
                 };
                 recorder.start();
                 setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
@@ -571,32 +451,29 @@
         }
 
         function stopProRec() { 
-            isProRunning = false; 
-            if (proInterval) clearInterval(proInterval); 
-            if(restartTimer) clearTimeout(restartTimer);
-            if (recognition) {
-                recognition.onend = null;
-                try { recognition.stop(); } catch(e) {}
-            }
-            document.getElementById('pro-start').disabled = false; 
-            document.getElementById('pro-stop').disabled = true; 
-            document.getElementById('interim-text').innerText = "";
-            setStatus("세션 중단됨", false);
-            log("모든 자막 세션이 종료되었습니다.");
+            isProRunning = false; clearInterval(proInterval);
+            if (recognition) { recognition.onend = null; try { recognition.stop(); } catch(e) {} }
+            document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true;
+            document.getElementById('interim-text').innerText = ""; setStatus("IDLE", false);
         }
 
-        async function callAI() {
+        async function callAI(question = null) {
             const text = document.getElementById('youtube-text').innerText;
-            if (text.length < 10) return log("분석할 자막 데이터가 충분하지 않습니다.", true);
-            log("AI가 실시간 분석을 시작합니다...");
-            setStatus("AI 분석 중", true);
+            if (text.length < 10) return log("데이터 부족", true);
+            const aiArea = document.getElementById('youtube-ai');
+            if (question) {
+                aiArea.innerHTML += `<div style="margin-top:10px; color:var(--primary);">Q: ${question}</div>`;
+                document.getElementById('chat-input').value = "";
+            } else {
+                aiArea.innerHTML = "분석 중...";
+            }
             try {
-                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
+                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, question }) });
                 const data = await res.json();
-                document.getElementById('youtube-ai').innerHTML = data.result || "AI 분석에 실패했습니다.";
-                log("분석 완료.");
-            } catch (e) { log("AI 요청 중 오류 발생.", true); }
-            finally { if(isProRunning) setStatus("자막 캡처 중", true); else setStatus("세션 중단됨", false); }
+                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px;">A: ${data.result}</div>`;
+                else aiArea.innerHTML = data.result;
+                aiArea.scrollTop = aiArea.scrollHeight;
+            } catch (e) { log("AI 오류", true); }
         }
     </script>
 </body>
