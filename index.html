@@ -161,35 +161,91 @@
 
     <nav>
         <div class="nav-item active" onclick="switchMode('mic')">🎙️ 1. 내 목소리 기록</div>
-        <div class="nav-item" onclick="switchMode('youtube')">📺 2. 영상 실시간 자막</div>
+        <div class="nav-item" onclick="switchMode('youtube')">📺 2. 고정밀 영상 자막 (Pro)</div>
     </nav>
 
-    <!-- 모드 2: 영상 자막 -->
+    <!-- 모드 2: 영상 자막 (Whisper 엔진) -->
     <div id="youtube-container" class="container">
         <div class="info-banner">
-            🎧 <strong>소리가 안 들리나요?</strong> [녹음 탭] -> [CABLE Output 속성] -> [수신 대기] -> <strong>[이 장치로 듣기]</strong>를 체크하고 보청기를 선택하세요!
+            ✨ <strong>Pro 모드 가동:</strong> 이제 노래 가사와 시끄러운 영상도 정확하게 인식합니다! (Groq Whisper 엔진)
         </div>
 
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">📺 실시간 영상 자막</div>
+                <div class="card-header">📺 실시간 고정밀 자막 (3초 단위 업데이트)</div>
                 <div id="youtube-scroll" class="scroll-area" style="background:#000;">
-                    <span id="youtube-final"></span>
-                    <span id="youtube-interim"></span>
+                    <div id="youtube-whisper-text" style="color:#FFEB3B; font-size: 1.4rem; font-weight: bold;"></div>
                 </div>
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
-                <div class="card-header" style="color: #d1b3ff;">🧠 AI 영상 요약</div>
+                <div class="card-header" style="color: #d1b3ff;">🧠 AI 내용 요약</div>
                 <div class="scroll-area" id="youtube-ai"></div>
             </div>
         </div>
 
         <div class="controls">
-            <button onclick="startRec('youtube')" id="youtube-start" class="btn btn-start">📺 자막 시작</button>
-            <button onclick="stopRec()" id="youtube-stop" class="btn btn-stop" disabled>■ 중지</button>
-            <button onclick="callAI('youtube')" class="btn btn-ai">✨ AI 요약하기</button>
+            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 Pro 자막 시작</button>
+            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 중지</button>
+            <button onclick="callAI('youtube')" class="btn btn-ai">✨ 요약하기</button>
         </div>
     </div>
+
+    <script>
+        let mediaRecorder = null;
+        let proInterval = null;
+        let isProRunning = false;
+
+        async function startProRec() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                isProRunning = true;
+                document.getElementById('pro-start').disabled = true;
+                document.getElementById('pro-stop').disabled = false;
+
+                // 3초마다 녹음해서 서버로 전송
+                proInterval = setInterval(async () => {
+                    if (!isProRunning) return;
+                    
+                    const recorder = new MediaRecorder(stream);
+                    const chunks = [];
+                    
+                    recorder.ondataavailable = (e) => chunks.push(e.data);
+                    recorder.onstop = async () => {
+                        const blob = new Blob(chunks, { type: 'audio/webm' });
+                        const formData = new FormData();
+                        formData.append('file', blob, 'audio.webm');
+                        formData.append('model', 'whisper-large-v3');
+                        formData.append('language', 'ko');
+
+                        try {
+                            const res = await fetch('/api/stt', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const data = await res.json();
+                            if (data.text) {
+                                const box = document.getElementById('youtube-whisper-text');
+                                box.innerHTML += data.text + " ";
+                                document.getElementById('youtube-scroll').scrollTop = document.getElementById('youtube-scroll').scrollHeight;
+                            }
+                        } catch (err) { console.error("STT 에러:", err); }
+                    };
+
+                    recorder.start();
+                    setTimeout(() => recorder.stop(), 3000); // 3초 녹음
+                }, 3500); // 3.5초마다 반복
+
+            } catch (err) {
+                alert("마이크 연결 실패: " + err.message);
+            }
+        }
+
+        function stopProRec() {
+            isProRunning = false;
+            clearInterval(proInterval);
+            document.getElementById('pro-start').disabled = false;
+            document.getElementById('pro-stop').disabled = true;
+        }
 
     <!-- 모드 1: 내 목소리 -->
     <div id="mic-container" class="container active">
