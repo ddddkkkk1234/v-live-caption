@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption | 고정밀 AI 자막</title>
+    <title>V-Live Caption | AI 실시간 자막</title>
     <style>
         :root {
             --primary: #4CAF50;
@@ -56,22 +56,27 @@
         .container.active { display: flex; }
 
         .card { background: var(--surface); border-radius: 16px; border: 1px solid #333; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; }
-        .card-header { padding: 1rem 1.2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid #333; font-weight: bold; display: flex; justify-content: space-between; }
+        .card-header { padding: 1rem 1.2rem; background: rgba(255,255,255,0.05); border-bottom: 1px solid #333; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
 
         .scroll-area { flex: 1; padding: 1.2rem; overflow-y: auto; height: 40vh; line-height: 1.8; font-size: 1.3rem; }
         
         .controls { display: flex; gap: 12px; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
-        .btn { padding: 0.8rem 1.5rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .btn { padding: 0.8rem 1.5rem; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
+        .btn-pip { background: #444; color: white; font-size: 0.75rem; padding: 5px 10px; }
 
-        .selector-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #444; }
-        select { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 6px; width: 100%; margin-top: 10px; font-family: inherit; }
+        .selector-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #444; display: flex; gap: 10px; flex-wrap: wrap; }
+        .selector-item { flex: 1; min-width: 150px; }
+        select { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 6px; width: 100%; margin-top: 5px; font-family: inherit; }
 
         #debug-log { background: #000; color: #0f0; font-family: monospace; font-size: 0.75rem; padding: 10px; height: 100px; overflow-y: auto; border: 1px solid #333; border-radius: 8px; margin-top: 10px; }
 
         footer { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+        
+        #pip-canvas { display: none; }
+        #pip-video { display: none; }
     </style>
 </head>
 <body>
@@ -86,54 +91,78 @@
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('youtube')">📺 2. 고정밀 자막(Pro)</div>
-        <div class="nav-item" onclick="switchMode('mic')">🎙️ 1. 일반 기록</div>
+        <div class="nav-item active" onclick="switchMode('youtube')">📺 실시간 자막</div>
+        <div class="nav-item" onclick="switchMode('mic')">🎙️ 일반 기록</div>
     </nav>
 
     <div id="youtube-container" class="container active">
         <div class="selector-box">
-            <strong>🎤 장치 선택</strong>
-            <select id="device-select" onchange="initAudio()">
-                <option value="">마이크 목록을 불러오는 중...</option>
-            </select>
+            <div class="selector-item">
+                <strong>🎤 마이크 선택</strong>
+                <select id="device-select" onchange="initAudio()">
+                    <option value="">불러오는 중...</option>
+                </select>
+            </div>
+            <div class="selector-item">
+                <strong>⚙️ STT 엔진</strong>
+                <select id="engine-select">
+                    <option value="web-speech">Web Speech API (무료/무제한)</option>
+                    <option value="groq">Groq Whisper (고정밀/유료)</option>
+                </select>
+            </div>
+            <div class="selector-item">
+                <strong>🌐 언어 설정</strong>
+                <select id="lang-select">
+                    <option value="ko-KR">한국어 (KO)</option>
+                    <option value="en-US">영어 (EN)</option>
+                    <option value="auto">자동 감지</option>
+                </select>
+            </div>
         </div>
 
         <div class="content-grid">
             <div class="card">
-                <div class="card-header">📺 실시간 AI 자막</div>
+                <div class="card-header">
+                    <span>📺 실시간 자막 화면</span>
+                    <button id="pip-btn" onclick="togglePIP()" class="btn btn-pip">📺 PIP 모드</button>
+                </div>
                 <div id="youtube-scroll" class="scroll-area" style="background:#000;">
                     <div id="youtube-text" style="color:#FFEB3B; font-weight:bold;"></div>
                 </div>
             </div>
-            <div class="card" style="border-color: var(--ai-accent);"><div class="card-header">🧠 AI 요약</div><div class="scroll-area" id="youtube-ai" style="font-size:1rem;"></div></div>
+            <div class="card" style="border-color: var(--ai-accent);">
+                <div class="card-header">🧠 AI 실시간 요약</div>
+                <div class="scroll-area" id="youtube-ai" style="font-size:1rem;"></div>
+            </div>
         </div>
 
         <div class="controls">
             <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 시작</button>
             <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 중지</button>
-            <button onclick="callAI('youtube')" class="btn btn-ai">✨ 요약하기</button>
+            <button onclick="callAI()" class="btn btn-ai">✨ 요약하기</button>
         </div>
 
-        <div id="debug-log">시스템 대기 중...</div>
+        <div id="debug-log">시스템 준비 완료...</div>
     </div>
 
-    <div id="mic-container" class="container">
-        <div class="info-banner">일반 모드입니다.</div>
-        <div class="content-grid">
-            <div class="card"><div class="card-header">📝 기록</div><div id="mic-scroll" class="scroll-area"><span id="mic-final"></span></div></div>
-            <div class="card"><div class="card-header">🧠 해석</div><div id="mic-ai" class="scroll-area"></div></div>
-        </div>
-    </div>
+    <!-- PIP용 요소 -->
+    <canvas id="pip-canvas" width="800" height="200"></canvas>
+    <video id="pip-video" autoplay playsinline muted></video>
 
     <script>
         let proInterval = null;
         let isProRunning = false;
         let audioContext = null;
         let stream = null;
+        let recognition = null;
+        
+        const pipCanvas = document.getElementById('pip-canvas');
+        const pipVideo = document.getElementById('pip-video');
+        const pipCtx = pipCanvas.getContext('2d');
 
         const log = (msg, isError = false) => {
             const box = document.getElementById('debug-log');
-            const color = isError ? 'red' : '#0f0';
+            const color = isError ? '#ff5252' : '#0f0';
             box.innerHTML += `<span style="color:${color}">> ${msg}</span><br>`;
             box.scrollTop = box.scrollHeight;
         };
@@ -142,7 +171,7 @@
             try {
                 if (audioContext) audioContext.close();
                 const deviceId = document.getElementById('device-select').value;
-                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -164,29 +193,99 @@
                     let avg = Math.round((sum / data.length) * 2.5);
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
+                    
+                    updatePipCanvas();
                     if(audioContext.state !== 'closed') requestAnimationFrame(draw);
                 }
                 draw();
-                log("마이크 연결됨: " + (mics.find(m => m.deviceId === deviceId)?.label || "기본값"));
+                log("마이크 활성화됨");
             } catch(e) { log("마이크 에러: " + e.message, true); }
         }
         initAudio();
+
+        function updatePipCanvas() {
+            pipCtx.fillStyle = "black";
+            pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
+            pipCtx.fillStyle = "#FFEB3B";
+            pipCtx.font = "bold 40px Pretendard, sans-serif";
+            pipCtx.textAlign = "center";
+            const text = document.getElementById('youtube-text').innerText;
+            const lastWords = text.split(' ').slice(-12).join(' ');
+            pipCtx.fillText(lastWords, pipCanvas.width/2, pipCanvas.height/2 + 15);
+        }
+
+        async function togglePIP() {
+            try {
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                } else {
+                    if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream();
+                    await pipVideo.play();
+                    await pipVideo.requestPictureInPicture();
+                }
+            } catch (e) { log("PIP 에러: " + e.message, true); }
+        }
 
         function switchMode(mode) {
             document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(mode + '-container').classList.add('active');
-            event.currentTarget.classList.add('active');
             stopProRec();
         }
 
         async function startProRec() {
             if (!stream) await initAudio();
+            const engine = document.getElementById('engine-select').value;
+            const lang = document.getElementById('lang-select').value;
+            
             isProRunning = true;
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
-            log("🚀 Pro 자막 세션 시작 (3초 단위)...");
+            
+            log(`🚀 자막 생성 시작 (엔진: ${engine}, 언어: ${lang})`);
 
+            if (engine === 'web-speech') {
+                startWebSpeech(lang);
+            } else {
+                startGroqWhisper(lang);
+            }
+        }
+
+        function startWebSpeech(lang) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                log("❌ 이 브라우저는 Web Speech API를 지원하지 않습니다.", true);
+                stopProRec();
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = lang === 'auto' ? navigator.language : lang;
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
+                }
+                if (finalTranscript) {
+                    document.getElementById('youtube-text').innerHTML += finalTranscript + " ";
+                    document.getElementById('youtube-scroll').scrollTop = 99999;
+                }
+            };
+
+            recognition.onend = () => {
+                if (isProRunning) recognition.start();
+            };
+
+            recognition.onerror = (e) => log("WebSpeech 에러: " + e.error, true);
+            recognition.start();
+        }
+
+        function startGroqWhisper(lang) {
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
                 const recorder = new MediaRecorder(stream);
@@ -194,29 +293,24 @@
                 recorder.ondataavailable = e => chunks.push(e.data);
                 recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'audio/webm' });
-                    if (blob.size < 2000) { log("⚠️ 무음 감지 (데이터 부족)"); return; }
+                    if (blob.size < 2500) return;
                     
                     const formData = new FormData();
                     formData.append('file', blob, 'audio.webm');
                     formData.append('model', 'whisper-large-v3');
-                    formData.append('language', 'ko');
+                    if (lang !== 'auto') formData.append('language', lang.split('-')[0]);
                     
-                    log(`📤 서버로 전송 중 (${Math.round(blob.size/1024)}KB)...`);
-                        try {
-                            const res = await fetch('/api/stt', { method: 'POST', body: formData });
-                            const data = await res.json();
-                            
-                            if (res.ok && data.text && data.text.trim()) {
-                                log(`📥 수신: "${data.text.substring(0, 20)}..."`);
-                                document.getElementById('youtube-text').innerHTML += data.text + " ";
+                    try {
+                        const res = await fetch('/api/stt', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (res.ok && data.text) {
+                            const txt = data.text.trim();
+                            if (txt && !txt.includes("감사합니다") && !txt.toLowerCase().includes("thank you")) {
+                                document.getElementById('youtube-text').innerHTML += txt + " ";
                                 document.getElementById('youtube-scroll').scrollTop = 99999;
-                            } else if (data.error) {
-                                log(`❌ AI 에러: ${data.error}`, true);
-                            } else {
-                                // 만약 텍스트가 정말로 비어있다면 (무음 등)
-                                log(`⚪ 음성 인식 결과 없음 (조용한 상태)`);
                             }
-                        } catch (e) { log("❌ 네트워크 통신 실패", true); }
+                        }
+                    } catch (e) { console.error(e); }
                 };
                 recorder.start();
                 setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
@@ -225,20 +319,24 @@
 
         function stopProRec() { 
             isProRunning = false; 
-            clearInterval(proInterval); 
+            if (proInterval) clearInterval(proInterval); 
+            if (recognition) {
+                recognition.onend = null;
+                recognition.stop();
+            }
             document.getElementById('pro-start').disabled = false; 
             document.getElementById('pro-stop').disabled = true; 
-            log("⏹️ 중지됨");
+            log("⏹️ 자막 중지됨");
         }
 
-        async function callAI(mode) {
+        async function callAI() {
             const text = document.getElementById('youtube-text').innerText;
-            if (text.length < 5) return alert("자막 부족");
-            log("🧠 AI 요약 요청 중...");
+            if (text.length < 10) return log("⚠️ 요약할 내용이 부족합니다.", true);
+            log("🧠 AI 요약 중...");
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
                 const data = await res.json();
-                document.getElementById('youtube-ai').innerHTML = data.result || data.error;
+                document.getElementById('youtube-ai').innerHTML = data.result || "요약 실패";
                 log("✅ 요약 완료");
             } catch (e) { log("❌ 요약 실패", true); }
         }

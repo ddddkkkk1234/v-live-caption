@@ -30,7 +30,12 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `당신은 실시간 대화 분석 전문가입니다. 다음 대화 내용을 바탕으로 사용자의 의도와 핵심 요점을 2-3줄 내외로 아주 명확하고 친절하게 해석해주세요. 말투는 '~해요' 체로 부드럽게 해주세요: "${text}"`
+            text: `당신은 대화 요약 전문가입니다. 다음은 실시간으로 생성된 자막 내용입니다. 
+            중복되는 문장이나 불완전한 문장은 무시하고, 전체적인 맥락을 파악하여 
+            주요 핵심 내용을 3줄 이내의 불렛 포인트로 요약해주세요. 
+            말투는 '~해요' 체로 친절하게 작성해주세요.
+            
+            내용: "${text}"`
           }]
         }]
       })
@@ -38,8 +43,18 @@ export async function onRequestPost(context) {
 
     const data = await response.json();
     
-    if (data.error) {
-      throw new Error(data.error.message);
+    if (!response.ok || data.error) {
+      return new Response(JSON.stringify({ error: data.error?.message || "AI 응답 오류" }), {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    if (!data.candidates || data.candidates.length === 0) {
+      return new Response(JSON.stringify({ error: "요약 결과를 생성하지 못했습니다. (검열 또는 데이터 부족)" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
     const aiResponse = data.candidates[0].content.parts[0].text;
