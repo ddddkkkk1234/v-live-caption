@@ -248,7 +248,7 @@
             <button onclick="downloadTranscript()" class="btn btn-download">📥 자막 다운로드 (.txt)</button>
         </div>
 
-        <div id="debug-log">안전한 로컬 환경에서 시스템이 작동 중입니다.</div>
+        <div id="debug-log">안전한 로컬 환경에서 시스템이 작동 중입니다. (Chrome 권장)</div>
     </div>
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
@@ -331,6 +331,7 @@
         function cleanText(text) {
             const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you."];
             let cleaned = text.trim();
+            if(!cleaned) return "";
             if(noise.some(n => cleaned.toLowerCase() === n)) return "";
             if(cleaned === lastLoggedText) return ""; 
             lastLoggedText = cleaned;
@@ -344,7 +345,7 @@
                 const constraints = { 
                     audio: { 
                         deviceId: deviceId ? { exact: deviceId } : undefined, 
-                        autoGainControl: false, // 감도 안정을 위해 수동 제어
+                        autoGainControl: false,
                         echoCancellation: false,
                         noiseSuppression: false
                     } 
@@ -370,7 +371,6 @@
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
-                    // 감도 보정 (실시간 피드백 강화)
                     let avg = Math.round((sum / data.length) * 4.8); 
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
@@ -422,23 +422,36 @@
             document.getElementById('pro-start').disabled = true;
             document.getElementById('pro-stop').disabled = false;
             setStatus("자막 캡처 중", true);
-            log(`STT 엔진 가동 시작.`);
+            
+            log(`[시스템] 엔진 가동: ${engine}`);
+
             if (engine === 'web-speech') startWebSpeech(lang);
             else startGroqWhisper(lang);
         }
 
         function startWebSpeech(lang) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return log("브라우저가 음성 인식을 지원하지 않습니다.", true);
+            if (!SpeechRecognition) {
+                log("브라우저가 음성 인식을 지원하지 않습니다. (Chrome/Edge 권장)", true);
+                stopProRec();
+                return;
+            }
+
             recognition = new SpeechRecognition();
             recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = lang === 'auto' ? navigator.language : lang;
+            recognition.interimResults = true; // 중간 결과 활성화로 반응성 개선
+            recognition.lang = lang === 'auto' ? (navigator.language || 'ko-KR') : lang;
 
+            log(`[Web STT] 음성 인식 시작 (언어: ${recognition.lang})`);
+
+            recognition.onstart = () => log("[Web STT] 엔진이 소리를 듣기 시작했습니다.");
+            
             recognition.onresult = (event) => {
                 let finalTranscript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
                 }
                 if (finalTranscript) {
                     const cleaned = cleanText(finalTranscript);
@@ -447,14 +460,31 @@
                         textEl.innerText += cleaned + " ";
                         localStorage.setItem('vlive_transcript', textEl.innerText);
                         document.getElementById('youtube-scroll').scrollTop = 999999;
+                        log(`[인식 성공] ${cleaned.substring(0, 15)}...`);
                     }
                 }
             };
-            recognition.onend = () => { if (isProRunning) recognition.start(); };
-            recognition.start();
+
+            recognition.onerror = (e) => {
+                log(`[Web STT 에러] ${e.error}`, true);
+                if (e.error === 'no-speech') log("소리가 감지되지 않습니다. 마이크 설정을 확인해주세요.", true);
+                if (e.error === 'not-allowed') log("마이크 권한이 거부되었습니다.", true);
+            };
+
+            recognition.onend = () => {
+                if (isProRunning) {
+                    log("[Web STT] 세션 재연결 중...");
+                    recognition.start();
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch(e) { log(`인식 엔진 시작 실패: ${e.message}`, true); }
         }
 
         function startGroqWhisper(lang) {
+            log("[Premium] Whisper 세션 시작 (3.5초 간격)");
             proInterval = setInterval(async () => {
                 if (!isProRunning) return;
                 const recorder = new MediaRecorder(stream);
@@ -489,11 +519,14 @@
         function stopProRec() { 
             isProRunning = false; 
             if (proInterval) clearInterval(proInterval); 
-            if (recognition) { recognition.onend = null; recognition.stop(); }
+            if (recognition) {
+                recognition.onend = null;
+                try { recognition.stop(); } catch(e) {}
+            }
             document.getElementById('pro-start').disabled = false; 
             document.getElementById('pro-stop').disabled = true; 
             setStatus("세션 중단됨", false);
-            log("자막 생성이 종료되었습니다.");
+            log("모든 자막 세션이 종료되었습니다.");
         }
 
         async function callAI() {
