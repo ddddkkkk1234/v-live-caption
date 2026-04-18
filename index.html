@@ -338,7 +338,14 @@
             try {
                 if (audioContext) audioContext.close();
                 const deviceId = document.getElementById('device-select').value;
-                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: true } };
+                const constraints = { 
+                    audio: { 
+                        deviceId: deviceId ? { exact: deviceId } : undefined, 
+                        autoGainControl: false,
+                        echoCancellation: false,
+                        noiseSuppression: false
+                    } 
+                };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -348,16 +355,19 @@
                 select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || 'MIC'}</option>`).join('');
 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') await audioContext.resume();
+
                 const source = audioContext.createMediaStreamSource(stream);
                 const analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
+                analyser.fftSize = 512;
+                analyser.smoothingTimeConstant = 0.4;
                 source.connect(analyser);
                 const data = new Uint8Array(analyser.frequencyBinCount);
                 
                 function draw() {
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 3.5); 
+                    let avg = Math.round((sum / data.length) * 4.5); 
                     document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
                     document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
                     updatePipCanvas();
