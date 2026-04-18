@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>V-Live Caption | AI 자막 & 해석 서비스</title>
-    <meta name="description" content="내 목소리 기록부터 영상 실시간 자막까지, AI가 의도를 해석해줍니다.">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
-
     <style>
         :root {
             --primary: #4CAF50;
@@ -38,7 +35,6 @@
             border-bottom: 1px solid #333;
         }
 
-        /* 탭 메뉴 스타일 */
         nav {
             display: flex;
             background-color: var(--nav-bg);
@@ -144,7 +140,6 @@
         .btn-start { background: var(--primary); color: white; }
         .btn-stop { background: var(--danger); color: white; }
         .btn-ai { background: var(--ai-accent); color: white; }
-        .btn-help { background: #555; color: white; font-size: 0.8rem; padding: 0.5rem 0.8rem; }
 
         .info-banner {
             background: rgba(52, 152, 219, 0.1);
@@ -155,9 +150,26 @@
             line-height: 1.5;
         }
 
+        /* 소리 감지 게이지 스타일 */
+        .audio-meter {
+            width: 100%;
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .audio-meter-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            transition: width 0.1s;
+        }
+
         footer { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
 
-        /* PIP 및 유틸 */
         #pip-canvas { display: none; }
         #pip-video { display: none; }
     </style>
@@ -176,9 +188,10 @@
 
     <!-- 제품 1: 내 목소리 모드 -->
     <div id="mic-container" class="container active">
-        <div class="info-banner">
-            💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하시면 실시간으로 기록됩니다. 대화가 끝난 후 <strong>[AI 의도 해석]</strong> 버튼을 누르면 AI 비서가 요점을 정리해 줍니다.
+        <div class="info-banner" id="mic-info">
+            💡 <strong>사용 팁:</strong> 마이크를 켜고 말씀하세요.
         </div>
+        <div class="audio-meter"><div id="mic-meter" class="audio-meter-fill"></div></div>
         
         <div class="content-grid">
             <div class="card">
@@ -190,9 +203,7 @@
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
                 <div class="card-header" style="color: #d1b3ff;">🧠 AI 의도 해석 비서</div>
-                <div class="scroll-area">
-                    <div id="mic-ai" class="ai-result">내용이 쌓이면 아래 해석 버튼을 눌러보세요.</div>
-                </div>
+                <div class="scroll-area"><div id="mic-ai" class="ai-result">내용이 쌓이면 해석 버튼을 누르세요.</div></div>
             </div>
         </div>
 
@@ -205,10 +216,10 @@
 
     <!-- 제품 2: 영상 자막 모드 -->
     <div id="youtube-container" class="container">
-        <div class="info-banner" style="border-color: #f1c40f; background: rgba(241, 196, 15, 0.05);">
-            ⚠️ <strong>PC 사용자 필독:</strong> 영상 소리를 인식하려면 [윈도우 소리 설정]에서 <strong>'스테레오 믹스'</strong>를 기본 장치로 설정해야 합니다. <br>
-            <button class="btn-help" onclick="alert('1. 작업표시줄 소리 아이콘 우클릭\n2. 소리 설정 열기\n3. 입력 장치를 [스테레오 믹스]로 변경\n(안 보이면 [사운드 제어판]에서 사용 안 함으로 된 장치 표시 체크)')">설정 방법 자세히 보기</button>
+        <div class="info-banner" id="youtube-info">
+            🎧 <strong>에어팟 필수 셋팅:</strong> [스테레오 믹스 속성] -> [수신 대기] -> <strong>[이 장치로 듣기] 체크</strong> -> 재생 장치를 <strong>[에어팟]</strong>으로 설정하세요!
         </div>
+        <div class="audio-meter"><div id="youtube-meter" class="audio-meter-fill"></div></div>
 
         <div class="content-grid">
             <div class="card">
@@ -223,9 +234,7 @@
             </div>
             <div class="card" style="border-color: var(--ai-accent);">
                 <div class="card-header" style="color: #d1b3ff;">🧠 실시간 내용 요약</div>
-                <div class="scroll-area">
-                    <div id="youtube-ai" class="ai-result">영상 소리가 들리면 AI가 내용을 요약해 줍니다.</div>
-                </div>
+                <div class="scroll-area"><div id="youtube-ai" class="ai-result">영상이 시작되면 AI가 핵심을 요약합니다.</div></div>
             </div>
         </div>
 
@@ -239,26 +248,49 @@
     <canvas id="pip-canvas" width="600" height="200"></canvas>
     <video id="pip-video" autoplay muted playsinline></video>
 
-    <footer>
-        &copy; 2026 V-Live Caption | 본 서비스는 Google Gemini AI와 함께합니다.
-    </footer>
-
     <script>
         let recognition = null;
-        let activeMode = 'mic';
+        let audioContext = null;
+        let analyser = null;
+        let animationId = null;
 
         const ui = {
-            mic: { final: 'mic-final', interim: 'mic-interim', status: 'mic-status', ai: 'mic-ai', scroll: 'mic-scroll', start: 'mic-start', stop: 'mic-stop' },
-            youtube: { final: 'youtube-final', interim: 'youtube-interim', status: 'youtube-status', ai: 'youtube-ai', scroll: 'youtube-scroll', start: 'youtube-start', stop: 'youtube-stop' }
+            mic: { final: 'mic-final', interim: 'mic-interim', info: 'mic-info', meter: 'mic-meter', ai: 'mic-ai', scroll: 'mic-scroll', start: 'mic-start', stop: 'mic-stop' },
+            youtube: { final: 'youtube-final', interim: 'youtube-interim', info: 'youtube-info', meter: 'youtube-meter', ai: 'youtube-ai', scroll: 'youtube-scroll', start: 'youtube-start', stop: 'youtube-stop' }
         };
 
         function switchMode(mode) {
-            activeMode = mode;
             document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(mode + '-container').classList.add('active');
             event.currentTarget.classList.add('active');
             if(recognition) stopRec(mode === 'mic' ? 'youtube' : 'mic');
+        }
+
+        async function startAudioMeter(mode) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                const meterFill = document.getElementById(ui[mode].meter);
+
+                function updateMeter() {
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    let average = sum / dataArray.length;
+                    meterFill.style.width = Math.min(100, average * 2) + "%";
+                    animationId = requestAnimationFrame(updateMeter);
+                }
+                updateMeter();
+            } catch (err) {
+                console.error("오디오 미터 에러:", err);
+            }
         }
 
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -270,32 +302,36 @@
             recognition.lang = 'ko-KR';
             recognition.continuous = true;
 
+            const finalSpan = document.getElementById(ui[mode].final);
+            const interimSpan = document.getElementById(ui[mode].interim);
+            const infoBanner = document.getElementById(ui[mode].info);
+
             recognition.onstart = () => {
                 document.getElementById(ui[mode].start).disabled = true;
                 document.getElementById(ui[mode].stop).disabled = false;
+                infoBanner.innerHTML = "🟢 <strong>소리 감시 중...</strong> 에어팟으로 소리가 들리나요?";
+                startAudioMeter(mode);
+            };
+
+            recognition.onerror = (event) => {
+                infoBanner.innerHTML = "❌ <strong>에러:</strong> " + event.error;
             };
 
             recognition.onend = () => {
                 document.getElementById(ui[mode].start).disabled = false;
                 document.getElementById(ui[mode].stop).disabled = true;
+                if(animationId) cancelAnimationFrame(animationId);
             };
 
             recognition.onresult = (event) => {
                 let interim = '';
-                const finalSpan = document.getElementById(ui[mode].final);
-                const interimSpan = document.getElementById(ui[mode].interim);
-                
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalSpan.innerText += event.results[i][0].transcript + ' ';
-                    } else {
-                        interim += event.results[i][0].transcript;
-                    }
+                    if (event.results[i].isFinal) finalSpan.innerText += event.results[i][0].transcript + ' ';
+                    else interim += event.results[i][0].transcript;
                 }
                 interimSpan.innerText = interim;
                 const scrollArea = document.getElementById(ui[mode].scroll);
                 scrollArea.scrollTop = scrollArea.scrollHeight;
-                
                 if (mode === 'youtube') updatePip(interim || finalSpan.innerText.split(' ').slice(-5).join(' '));
             };
             recognition.start();
@@ -305,10 +341,9 @@
 
         async function callAI(mode) {
             const text = document.getElementById(ui[mode].final).innerText;
-            if (!text || text.length < 5) return alert("데이터가 부족합니다.");
+            if (!text || text.length < 5) return alert("내용 부족");
             const aiBox = document.getElementById(ui[mode].ai);
-            aiBox.innerText = "⏳ AI 분석 중...";
-            
+            aiBox.innerText = "⏳ 요약 중...";
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
@@ -316,32 +351,23 @@
                     body: JSON.stringify({ text: text })
                 });
                 const data = await res.json();
-                aiBox.innerHTML = `<strong>💡 AI 결과:</strong>\n\n${data.result || data.error}`;
-            } catch (err) { aiBox.innerText = "❌ 연결 실패"; }
+                aiBox.innerHTML = `<strong>💡 요약:</strong>\n\n${data.result || data.error}`;
+            } catch (err) { aiBox.innerText = "❌ 실패"; }
         }
 
-        // PIP
         const canvas = document.getElementById('pip-canvas');
         const video = document.getElementById('pip-video');
         const ctx = canvas.getContext('2d');
-
         function updatePip(text) {
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#ffff00";
-            ctx.font = "bold 35px sans-serif";
-            ctx.textAlign = "center";
+            ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#ffff00"; ctx.font = "bold 35px sans-serif"; ctx.textAlign = "center";
             ctx.fillText(text.length > 25 ? text.substring(text.length - 25) : text, canvas.width/2, 110);
         }
-
         async function togglePip() {
-            try {
-                video.srcObject = canvas.captureStream();
-                await video.play();
-                await video.requestPictureInPicture();
-            } catch (err) { alert("PIP 오류"); }
+            try { video.srcObject = canvas.captureStream(); await video.play(); await video.requestPictureInPicture(); }
+            catch (err) { alert("PIP 오류"); }
         }
-        updatePip("자막 준비 완료");
+        updatePip("준비 완료");
     </script>
 </body>
 </html>
