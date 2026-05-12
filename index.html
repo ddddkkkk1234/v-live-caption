@@ -91,7 +91,7 @@
         }
         .selector-item { display: flex; flex-direction: column; gap: 8px; position: relative; }
         .selector-item label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        select, input[type="range"], input[type="color"] { 
+        select, input[type="range"], input[type="color"], .custom-input { 
             background: var(--surface-light); 
             color: var(--text-main); 
             border: 1px solid var(--border); 
@@ -160,7 +160,6 @@
         .footer-links a:hover { color: var(--primary); }
         .footer-info { color: #555; font-size: 0.75rem; }
 
-        /* New Info Sections Styles */
         .info-section { padding: 4rem 5%; background: var(--surface); margin-top: 2rem; border-top: 1px solid var(--border); }
         .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; max-width: 1200px; margin: 0 auto; }
         .info-card h2 { color: var(--primary); font-size: 1.5rem; margin-bottom: 1.5rem; }
@@ -174,8 +173,6 @@
         .faq-item h4 { color: #fff; margin-bottom: 0.8rem; font-size: 1.1rem; }
         .faq-item p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
     </style>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5553376072633585"
-     crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -195,9 +192,11 @@
 
     <nav>
         <div class="nav-item active" onclick="switchMode('youtube')">실시간 세션 (Live)</div>
+        <div class="nav-item" onclick="switchMode('shared')">이공간으로 (Shared)</div>
         <div class="nav-item" onclick="switchMode('mic')">기록 아카이브 (History)</div>
     </nav>
 
+    <!-- 실시간 세션 (Live) 컨테이너 -->
     <div id="youtube-container" class="container active">
         <div class="selector-box">
             <div class="selector-item">
@@ -243,21 +242,6 @@
             </div>
         </div>
 
-        <!-- AdSense Ad Unit -->
-        <div style="margin: 20px 0; text-align: center;">
-            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5553376072633585"
-                 crossorigin="anonymous"></script>
-            <ins class="adsbygoogle"
-                 style="display:block"
-                 data-ad-client="ca-pub-5553376072633585"
-                 data-ad-slot="5870420713"
-                 data-ad-format="auto"
-                 data-full-width-responsive="true"></ins>
-            <script>
-                 (adsbygoogle = window.adsbygoogle || []).push({});
-            </script>
-        </div>
-
         <div class="controls">
             <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작</button>
             <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료</button>
@@ -268,7 +252,58 @@
         <div id="debug-log">시스템 준비 완료.</div>
     </div>
 
-    <!-- 서비스 소개 및 가이드 -->
+    <!-- 이공간으로 (Shared) 컨테이너 -->
+    <div id="shared-container" class="container">
+        <div class="selector-box">
+            <div class="selector-item">
+                <label>방 번호 (Room ID)</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="room-id" class="custom-input" placeholder="방 번호를 입력하거나 생성하세요">
+                    <button onclick="generateRoomID()" class="btn btn-pip" style="white-space:nowrap; width: auto;">ID 생성</button>
+                </div>
+            </div>
+            <div class="selector-item">
+                <label>현재 상태</label>
+                <div id="shared-status" style="font-size:0.9rem; color:var(--text-muted); padding: 10px;">연결 대기 중...</div>
+            </div>
+            <div class="selector-item">
+                <label>역할 선택</label>
+                <select id="role-select">
+                    <option value="sender">보내기 (휴대폰용)</option>
+                    <option value="receiver" selected>받아보기 (PC/태블릿용)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem; flex:1;">
+            <div class="card-header">
+                <h3><span>📡</span> 실시간 중계 화면</h3>
+                <button onclick="clearSharedTranscript()" class="btn btn-pip">화면 비우기</button>
+            </div>
+            <div id="shared-scroll" class="scroll-area" style="height: 60vh;">
+                <div id="shared-text" style="font-size: 2.5rem; color: var(--caption-color); font-weight: 800; text-align: center; line-height: 1.4;">
+                    방 번호를 입력하고 접속하면 이곳에 자막이 표시됩니다.
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="shared-connect-btn" onclick="toggleSharedConnection()" class="btn btn-start">연결하기</button>
+        </div>
+    </div>
+
+    <!-- 기록 아카이브 (History) 컨테이너 -->
+    <div id="mic-container" class="container">
+        <div class="card">
+            <div class="card-header">
+                <h3><span>📁</span> 저장된 기록 아카이브</h3>
+            </div>
+            <div id="history-list" class="scroll-area">
+                저장된 기록이 없습니다.
+            </div>
+        </div>
+    </div>
+
     <section class="info-section">
         <div class="info-grid">
             <div class="info-card">
@@ -306,27 +341,6 @@
         </div>
     </section>
 
-    <!-- FAQ 섹션 -->
-    <section class="faq-section">
-        <h2 style="text-align: center; margin-bottom: 3rem; color: #fff;">자주 묻는 질문 (FAQ)</h2>
-        <div class="faq-item">
-            <h4>Q: 자막 생성은 무료인가요?</h4>
-            <p>A: 네, '일반 자막 모드(로컬 AI)'를 사용하시면 사용자의 브라우저 성능을 활용하여 완전히 무료이자 무제한으로 사용하실 수 있습니다. 별도의 서버 전송 없이 로컬에서 처리되어 개인정보 보호에도 유리합니다.</p>
-        </div>
-        <div class="faq-item">
-            <h4>Q: 어떤 브라우저에서 가장 잘 작동하나요?</h4>
-            <p>A: 최신 버전의 Chrome, Edge, Safari 브라우저를 권장합니다. 특히 로컬 AI 모드는 WebGPU 또는 WebAssembly 성능이 우수한 Chromium 기반 브라우저에서 최상의 속도를 보여줍니다.</p>
-        </div>
-        <div class="faq-item">
-            <h4>Q: AI 스마트 어시스턴트는 무엇인가요?</h4>
-            <p>A: 생성된 자막 데이터를 바탕으로 대규모 언어 모델(LLM)이 실시간으로 요약하거나, 사용자의 질문에 답변해주는 기능입니다. 긴 회의나 강의 내용을 한눈에 파악할 때 유용합니다.</p>
-        </div>
-        <div class="faq-item">
-            <h4>Q: 모바일에서도 사용 가능한가요?</h4>
-            <p>A: 네, 반응형 디자인이 적용되어 스마트폰과 태블릿에서도 자막을 확인하고 AI 어시스턴트를 이용하실 수 있습니다.</p>
-        </div>
-    </section>
-
     <footer>
         <div class="footer-links">
             <a href="privacy.html">개인정보처리방침</a>
@@ -338,6 +352,9 @@
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
     <video id="pip-video" autoplay playsinline muted></video>
+
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
@@ -355,6 +372,11 @@
         let lastLoggedText = ""; 
         let whisperInstance = null;
         
+        // Supabase 초기화 (익명 사용이 가능한 임시 세팅)
+        // 실제 운영시에는 본인의 프로젝트 URL과 API KEY로 변경해야 합니다.
+        let supabaseClient = null;
+        let roomSubscription = null;
+
         const pipCanvas = document.getElementById('pip-canvas');
         const pipVideo = document.getElementById('pip-video');
         const pipCtx = pipCanvas.getContext('2d');
@@ -365,6 +387,110 @@
             updateStyle();
             initAudio();
         };
+
+        function generateRoomID() {
+            const id = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('room-id').value = id;
+        }
+
+        function switchMode(mode) {
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            const targetContainer = document.getElementById(mode + '-container');
+            if (targetContainer) targetContainer.classList.add('active');
+            
+            const navItems = document.querySelectorAll('.nav-item');
+            if (mode === 'youtube') navItems[0].classList.add('active');
+            else if (mode === 'shared') navItems[1].classList.add('active');
+            else if (mode === 'mic') navItems[2].classList.add('active');
+            
+            stopProRec();
+        }
+
+        function clearSharedTranscript() {
+            document.getElementById('shared-text').innerText = "";
+        }
+
+        async function toggleSharedConnection() {
+            const btn = document.getElementById('shared-connect-btn');
+            const status = document.getElementById('shared-status');
+            const room = document.getElementById('room-id').value;
+            const role = document.getElementById('role-select').value;
+            
+            if (!room) return alert("방 번호를 입력해주세요.");
+
+            if (btn.innerText === "연결하기") {
+                // Supabase 초기화
+                if (!supabaseClient) {
+                    try {
+                        const configRes = await fetch('/api/config');
+                        const config = await configRes.json();
+                        
+                        if (!config.supabaseUrl || !config.supabaseKey) {
+                            alert("Cloudflare 환경 변수 설정이 필요합니다 (SUPABASE_URL, SUPABASE_KEY).");
+                            return;
+                        }
+                        
+                        supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+                    } catch (e) {
+                        alert("설정 정보를 불러오는데 실패했습니다.");
+                        return;
+                    }
+                }
+
+                btn.innerText = "연결 해제";
+                btn.classList.replace('btn-start', 'btn-stop');
+                status.innerText = `${room}번 방에 ${role === 'sender' ? '전송' : '수신'} 모드로 연결됨`;
+                status.style.color = "var(--primary)";
+
+                if (role === 'receiver') {
+                    // 수신 모드: 실시간 구독 시작
+                    roomSubscription = supabaseClient
+                        .channel(`room-${room}`)
+                        .on('broadcast', { event: 'caption' }, (payload) => {
+                            const sharedText = document.getElementById('shared-text');
+                            if (sharedText.innerText.includes("방 번호를 입력하고")) sharedText.innerText = "";
+                            sharedText.innerText += payload.payload.text + " ";
+                            // 자동 스크롤
+                            const scrollArea = document.getElementById('shared-scroll');
+                            scrollArea.scrollTop = scrollArea.scrollHeight;
+                        })
+                        .subscribe((status) => {
+                            if (status === 'SUBSCRIBED') {
+                                log(`${room}번 방 수신 시작`);
+                            }
+                        });
+                } else {
+                    // 전송 모드 채널 미리 열기
+                    roomSubscription = supabaseClient.channel(`room-${room}`).subscribe();
+                }
+            } else {
+                if (roomSubscription) {
+                    supabaseClient.removeChannel(roomSubscription);
+                    roomSubscription = null;
+                }
+                btn.innerText = "연결하기";
+                btn.classList.replace('btn-stop', 'btn-start');
+                status.innerText = "연결 대기 중...";
+                status.style.color = "var(--text-muted)";
+            }
+        }
+
+        // 텍스트를 외부로 공유하는 함수
+        async function broadcastText(text) {
+            const btn = document.getElementById('shared-connect-btn');
+            const room = document.getElementById('room-id').value;
+            const role = document.getElementById('role-select').value;
+
+            if (btn.innerText === "연결 해제" && role === 'sender' && room && supabaseClient) {
+                await supabaseClient.channel(`room-${room}`).send({
+                    type: 'broadcast',
+                    event: 'caption',
+                    payload: { text: text }
+                });
+            }
+        }
 
         function updateStyle() {
             const size = (localStorage.getItem('vlive_font_size') || document.getElementById('font-size-slider').value) + "rem";
@@ -397,6 +523,7 @@
 
         const log = (msg, isError = false) => {
             const box = document.getElementById('debug-log');
+            if (!box) return;
             const color = isError ? '#FF5252' : '#00E676';
             box.innerHTML += `<span style="color:${color}">[${new Date().toLocaleTimeString()}] ${msg}</span><br>`;
             box.scrollTop = box.scrollHeight;
@@ -405,27 +532,19 @@
         const setStatus = (status, active = false) => {
             const dot = document.getElementById('status-dot');
             const text = document.getElementById('status-text');
-            text.innerText = status.toUpperCase();
-            if(active) dot.classList.add('active'); else dot.classList.remove('active');
+            if (text) text.innerText = status.toUpperCase();
+            if (dot) { if(active) dot.classList.add('active'); else dot.classList.remove('active'); }
         };
 
         function cleanText(text) {
             let cleaned = text.trim();
             if(!cleaned) return "";
-
-            // 1. 단어 무한 도배 방지 (연속된 중복 단어/문구 제거)
-            // 예: "방금 방금 방금" -> "방금"
             const words = cleaned.split(/\s+/);
             const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
             cleaned = dedupedWords.join(' ');
-
-            // 2. 특정 금지어/소음 패턴 필터링
             const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
             if(noise.some(n => cleaned.toLowerCase() === n)) return "";
-
-            // 3. 직전 결과와 완전히 동일하면 무시
             if(cleaned === lastLoggedText) return ""; 
-            
             lastLoggedText = cleaned;
             return cleaned;
         }
@@ -433,15 +552,16 @@
         async function initAudio() {
             try {
                 if (audioContext && audioContext.state !== 'closed') await audioContext.close();
-                const deviceId = document.getElementById('device-select').value;
+                const deviceSelect = document.getElementById('device-select');
+                if (!deviceSelect) return;
+                const deviceId = deviceSelect.value;
                 const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } };
                 if(stream) stream.getTracks().forEach(track => track.stop());
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
-                const select = document.getElementById('device-select');
-                const currentVal = select.value;
-                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
+                const currentVal = deviceSelect.value;
+                deviceSelect.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
                 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
@@ -455,8 +575,10 @@
                     analyser.getByteFrequencyData(data);
                     let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
                     let avg = Math.round((sum / data.length) * 4.8); 
-                    document.getElementById('v-fill').style.width = Math.min(100, avg) + "%";
-                    document.getElementById('v-label').innerText = Math.min(100, avg) + "%";
+                    const vFill = document.getElementById('v-fill');
+                    const vLabel = document.getElementById('v-label');
+                    if (vFill) vFill.style.width = Math.min(100, avg) + "%";
+                    if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
                     updatePipCanvas();
                     requestAnimationFrame(draw);
                 }
@@ -466,11 +588,13 @@
         }
 
         function updatePipCanvas() {
+            if (!pipCtx) return;
             pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
             pipCtx.fillStyle = document.getElementById('text-color-picker').value;
             const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
             pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
-            const fullText = (document.getElementById('youtube-text').innerText).trim();
+            const youtubeText = document.getElementById('youtube-text');
+            const fullText = (youtubeText ? youtubeText.innerText : "").trim();
             const words = fullText.split(' ').slice(-8).join(' ');
             pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
         }
@@ -480,13 +604,6 @@
                 if (document.pictureInPictureElement) await document.exitPictureInPicture();
                 else { if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream(); await pipVideo.play(); await pipVideo.requestPictureInPicture(); }
             } catch (e) { log("PIP 에러", true); }
-        }
-
-        function switchMode(mode) {
-            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(mode + '-container').classList.add('active');
-            stopProRec();
         }
 
         async function startProRec() {
@@ -534,7 +651,6 @@
                         const decoded = await internalAudioCtx.decodeAudioData(audioData);
                         const audioFloat32 = decoded.getChannelData(0);
 
-                        // 추론 옵션 강화 (Hallucination 방지 유도)
                         const result = await whisperInstance(audioFloat32, { 
                             language: lang === 'auto' ? null : lang, 
                             task: 'transcribe',
@@ -549,6 +665,9 @@
                             el.innerText += cleaned + " ";
                             localStorage.setItem('vlive_transcript', el.innerText);
                             document.getElementById('youtube-scroll').scrollTop = 999999;
+                            
+                            // 실시간 공유 중이면 텍스트 전송
+                            broadcastText(cleaned);
                         }
                         await internalAudioCtx.close();
                     };
@@ -582,6 +701,9 @@
                                 el.innerText += cleaned + " ";
                                 localStorage.setItem('vlive_transcript', el.innerText);
                                 document.getElementById('youtube-scroll').scrollTop = 999999;
+                                
+                                // 실시간 공유 중이면 텍스트 전송
+                                broadcastText(cleaned);
                             }
                         }
                     } catch (e) {}
@@ -593,15 +715,23 @@
 
         function stopProRec() { 
             isProRunning = false; clearInterval(proInterval);
-            document.getElementById('pro-start').disabled = false; document.getElementById('pro-stop').disabled = true;
-            document.getElementById('interim-text').innerText = ""; setStatus("IDLE", false);
-            document.getElementById('model-loading').style.display = 'none';
+            const startBtn = document.getElementById('pro-start');
+            const stopBtn = document.getElementById('pro-stop');
+            if (startBtn) startBtn.disabled = false; 
+            if (stopBtn) stopBtn.disabled = true;
+            const interimText = document.getElementById('interim-text');
+            if (interimText) interimText.innerText = ""; 
+            setStatus("IDLE", false);
+            const modelLoading = document.getElementById('model-loading');
+            if (modelLoading) modelLoading.style.display = 'none';
         }
 
         async function callAI(question = null) {
-            const text = document.getElementById('youtube-text').innerText;
+            const textContent = document.getElementById('youtube-text');
+            const text = textContent ? textContent.innerText : "";
             if (text.length < 5) return log("데이터 부족", true);
             const aiArea = document.getElementById('youtube-ai');
+            if (!aiArea) return;
             if (question) {
                 aiArea.innerHTML += `<div style="margin-top:10px; color:var(--primary); font-weight:bold;">Q: ${question}</div>`;
                 document.getElementById('chat-input').value = "";
