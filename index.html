@@ -3,184 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>V-Live Caption Pro | 차세대 AI 실시간 자막</title>
+    <title>LiveNote | 실시간 AI 자막 도구</title>
+    <meta name="description" content="브라우저에서 마이크 음성을 실시간으로 인식하여 자막을 생성하는 무료 AI 자막 도구입니다. 청각장애인 자막 지원, AI 요약, 자막 공유 기능을 제공하며 별도의 설치 없이 바로 사용 가능합니다.">
+    <meta name="keywords" content="실시간 자막, 무료 자막 도구, 청각장애 자막, AI 자막, 실시간 음성 자막, 화상회의 자막, 강의 자막, 자막 공유, 배리어프리">
+    <meta property="og:title" content="LiveNote | 실시간 AI 자막 및 요약 서비스">
+    <meta property="og:description" content="마이크 음성을 실시간 자막으로 변환하고 AI로 요약해주는 무료 웹 서비스입니다. 청각장애 자막 보조로 활용해 보세요.">
+    <meta property="og:type" content="website">
     <meta name="google-adsense-account" content="ca-pub-5553376072633585">
-    <style>
-        :root {
-            --primary: #00E676;
-            --primary-dark: #00C853;
-            --ai-accent: #D1C4E9;
-            --ai-glow: #7C4DFF;
-            --danger: #FF5252;
-            --bg-dark: #0A0A0B;
-            --surface: #161618;
-            --surface-light: #222225;
-            --text-main: #F5F5F7;
-            --text-muted: #86868B;
-            --glass: rgba(255, 255, 255, 0.03);
-            --border: rgba(255, 255, 255, 0.1);
-            --caption-size: 1.4rem;
-            --caption-color: #FFEB3B;
-            --caption-opacity: 1;
-        }
-
-        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-
-        body {
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 5%;
-            background-color: rgba(10, 10, 11, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .brand { display: flex; align-items: center; gap: 10px; }
-        .brand h1 { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px; margin: 0; background: linear-gradient(90deg, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold; background: var(--glass); border: 1px solid var(--border); display: flex; align-items: center; gap: 5px; }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #555; transition: all 0.3s; }
-        .status-dot.active { background: var(--primary); box-shadow: 0 0 10px var(--primary); animation: pulse 1.5s infinite; }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
-        .volume-meter {
-            background: var(--surface);
-            padding: 6px 14px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border: 1px solid var(--border);
-        }
-        .v-bar { width: 60px; height: 4px; background: #2A2A2E; border-radius: 2px; overflow: hidden; }
-        .v-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), #81C784); transition: width 0.05s ease-out; }
-
-        nav { display: flex; background: var(--bg-dark); padding: 0 5%; gap: 20px; border-bottom: 1px solid var(--border); }
-        .nav-item { padding: 1rem 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent; transition: all 0.3s; }
-        .nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
-
-        .container { flex: 1; display: none; flex-direction: column; padding: 1.5rem 5%; max-width: 1400px; margin: 0 auto; width: 100%; gap: 1.5rem; }
-        .container.active { display: flex; }
-
-        #model-loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: #222; z-index: 1000; }
-        #model-loading-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.3s; box-shadow: 0 0 10px var(--primary); }
-
-        .selector-box { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-            gap: 1rem; 
-            background: var(--surface); 
-            padding: 1.2rem; 
-            border-radius: 16px; 
-            border: 1px solid var(--border);
-        }
-        .selector-item { display: flex; flex-direction: column; gap: 8px; position: relative; }
-        .selector-item label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        select, input[type="range"], input[type="color"], .custom-input { 
-            background: var(--surface-light); 
-            color: var(--text-main); 
-            border: 1px solid var(--border); 
-            padding: 10px; 
-            border-radius: 10px; 
-            font-size: 0.85rem; 
-            outline: none;
-            width: 100%;
-            cursor: pointer;
-        }
-
-        .content-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 1.5rem; flex: 1; min-height: 550px; }
-        @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
-
-        .card { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-        .card-header { padding: 1.2rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .card-header h3 { margin: 0; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-
-        .scroll-area { 
-            flex: 1; 
-            padding: 1.5rem; 
-            overflow-y: auto; 
-            height: 55vh; 
-            line-height: 1.6; 
-            word-break: keep-all;
-            background: radial-gradient(circle at top right, rgba(0,230,118,0.02), transparent);
-        }
-        
-        #youtube-text { font-size: var(--caption-size); color: var(--caption-color); opacity: var(--caption-opacity); font-weight: 700; transition: all 0.2s; }
-        .interim { color: var(--text-muted); font-style: italic; }
-
-        .chat-container { display: flex; flex-direction: column; height: 100%; }
-        #youtube-ai { flex: 1; font-size: 0.95rem; color: #D1D1D6; line-height: 1.7; padding-bottom: 10px; }
-        .chat-input-box { display: flex; gap: 8px; padding: 12px; background: var(--surface-light); border-top: 1px solid var(--border); }
-        .chat-input-box input { flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; outline: none; }
-        .chat-input-box input:focus { border-color: var(--primary); }
-        .btn-send { background: var(--primary); color: #000; padding: 6px 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
-
-        .controls { display: flex; gap: 1rem; justify-content: center; padding: 1rem 0; flex-wrap: wrap; }
-        .btn { padding: 0.85rem 1.8rem; border-radius: 14px; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
-        .btn:active { transform: scale(0.97); }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .btn-start { background: var(--primary); color: #000; }
-        .btn-stop { background: var(--surface-light); color: var(--danger); border: 1px solid rgba(255,82,82,0.1); }
-        .btn-download { background: var(--surface-light); color: var(--text-main); border: 1px solid var(--border); }
-        .btn-pip { background: var(--surface-light); color: var(--text-main); font-size: 0.7rem; padding: 6px 12px; border: 1px solid var(--border); }
-
-        #debug-log { background: #000; color: #4CAF50; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; padding: 12px; height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; opacity: 0.7; }
-
-        #pip-canvas { display: none; }
-        #pip-video { display: none; }
-
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-        footer {
-            padding: 3rem 5% 2rem;
-            background: var(--bg-dark);
-            border-top: 1px solid var(--border);
-            text-align: center;
-            margin-top: 4rem;
-        }
-        .footer-links { display: flex; justify-content: center; gap: 20px; margin-bottom: 1.5rem; }
-        .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
-        .footer-links a:hover { color: var(--primary); }
-        .footer-info { color: #555; font-size: 0.75rem; }
-
-        .info-section { padding: 4rem 5%; background: var(--surface); margin-top: 2rem; border-top: 1px solid var(--border); }
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; max-width: 1200px; margin: 0 auto; }
-        .info-card h2 { color: var(--primary); font-size: 1.5rem; margin-bottom: 1.5rem; }
-        .info-card p { color: var(--text-muted); line-height: 1.8; margin-bottom: 1rem; }
-        .step-list { list-style: none; padding: 0; }
-        .step-item { display: flex; gap: 15px; margin-bottom: 20px; }
-        .step-num { background: var(--primary); color: #000; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
-        
-        .faq-section { padding: 4rem 5%; max-width: 1000px; margin: 0 auto; }
-        .faq-item { margin-bottom: 2rem; background: var(--glass); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); }
-        .faq-item h4 { color: #fff; margin-bottom: 0.8rem; font-size: 1.1rem; }
-        .faq-item p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
-    </style>
+    <link rel="canonical" href="/">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5553376072633585" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="model-loading"><div id="model-loading-fill"></div></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <header>
         <div class="brand">
-            <h1>V-Live Caption <span style="color:var(--primary); font-weight:400;">PRO</span></h1>
+            <h1>LiveNote</h1>
             <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
         </div>
         <div class="volume-meter">
@@ -191,74 +32,252 @@
     </header>
 
     <nav>
-        <div class="nav-item active" onclick="switchMode('youtube')">실시간 세션 (Live)</div>
-        <div class="nav-item" onclick="switchMode('shared')">이공간으로 (Shared)</div>
-        <div class="nav-item" onclick="switchMode('mic')">기록 아카이브 (History)</div>
+        <div class="nav-item active" onclick="switchMode('youtube')">실시간 자막</div>
+        <div class="nav-item" onclick="switchMode('mic')">지난 자막</div>
+        <a class="nav-item" href="guide.html">사용 가이드</a>
     </nav>
 
     <!-- 실시간 세션 (Live) 컨테이너 -->
     <div id="youtube-container" class="container active">
+        <section class="intro-panel" aria-labelledby="intro-title">
+            <div>
+                <div class="origin-badge">LiveNote</div>
+                <h2 id="intro-title">실시간 AI 자막</h2>
+                <p>마이크로 들어오는 소리를 바로 자막으로 확인하세요.</p>
+            </div>
+        </section>
         <div class="selector-box">
             <div class="selector-item">
-                <label>입력 장치 선택 (Input)</label>
-                <select id="device-select" onchange="initAudio()"><option value="">장치 감지 중...</option></select>
+                <label>이용 가능한 마이크</label>
+                <select id="device-select" onchange="handleDeviceSelectChange()">
+                    <option value="" selected>이용 가능한 마이크 선택</option>
+                    <option value="__request_mic_permission">마이크 권한 허용하기</option>
+                </select>
             </div>
             <div class="selector-item">
                 <label>자막 모드 선택 (Mode)</label>
-                <select id="engine-select">
-                    <option value="local-whisper" selected>일반 자막 모드 (로컬 AI/무제한)</option>
-                    <option value="groq">고정밀 자막 모드 (클라우드/Pro)</option>
+                <select id="engine-select" onchange="updateEngineSettingsVisibility()">
+                    <option value="local-whisper" selected>내 기기에서 처리</option>
+                    <option value="groq">클라우드 고정밀</option>
                 </select>
             </div>
             <div class="selector-item">
-                <label>인식 언어 설정 (Lang)</label>
-                <select id="lang-select">
-                    <option value="ko">한국어 (Korean)</option>
-                    <option value="en">영어 (English)</option>
-                    <option value="auto">언어 자동 감지</option>
+                <div class="selector-inline">
+                    <div>
+                        <label>인식 언어</label>
+                        <select id="lang-select">
+                            <option value="auto" selected>언어 자동 감지</option>
+                            <option value="ko">한국어 (Korean)</option>
+                            <option value="en">영어 (English)</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip">환경설정</button>
+                </div>
+            </div>
+            <div class="selector-item">
+                <label>번역 언어</label>
+                <select id="translation-target">
+                    <option value="none" selected>번역 안 함</option>
+                    <option value="ko">한국어로 번역</option>
+                    <option value="en">영어로 번역</option>
                 </select>
             </div>
-            <div class="selector-item"><label>글자 크기</label><input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()"></div>
-            <div class="selector-item"><label>글자 색상</label><input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()"></div>
+        </div>
+
+        <div id="api-settings" class="api-settings">
+            <div class="api-summary">
+                <div class="api-summary-text">
+                    <strong>클라우드 고정밀</strong>
+                    <span id="api-mode-summary">기본 서버 API 사용 중 · 개인 키 선택 가능</span>
+                </div>
+                <button type="button" onclick="toggleApiDetail()" id="api-detail-toggle" class="btn btn-pip">API 설정</button>
+            </div>
+            <div id="api-detail" class="api-detail">
+                <p class="api-settings-title">클라우드 자막 API 설정</p>
+                <div class="selector-box">
+                    <label class="selector-item checkbox-row">
+                        <input type="checkbox" id="personal-api-enabled" onchange="togglePersonalApiSettings()">
+                        <span>개인 API 키 사용</span>
+                    </label>
+                    <div class="selector-item api-key-item">
+                        <label>제공업체</label>
+                        <select id="stt-provider" onchange="updateProviderModelOptions()">
+                            <option value="groq">Groq</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="gladia">Gladia</option>
+                            <option value="speechmatics">Speechmatics</option>
+                            <option value="ibm">IBM Watson STT</option>
+                            <option value="azure">Microsoft Azure Speech</option>
+                        </select>
+                    </div>
+                    <div class="selector-item api-key-item">
+                        <label>모델</label>
+                        <select id="stt-model" onchange="saveApiSettings()"></select>
+                    </div>
+                    <div class="selector-item api-key-item">
+                        <label>API 키</label>
+                        <input type="password" id="stt-api-key" class="custom-input" placeholder="sk-... 또는 gsk_..." autocomplete="off" oninput="saveApiSettings()">
+                    </div>
+                    <div class="selector-item api-key-item">
+                        <label>키 저장 위치</label>
+                        <select id="stt-key-storage" onchange="saveApiSettings()">
+                            <option value="local">이 브라우저에 저장</option>
+                            <option value="session">이번 세션만 저장</option>
+                        </select>
+                    </div>
+                    <div class="selector-item api-key-item provider-extra-item">
+                        <label id="stt-extra-label">추가 설정</label>
+                        <input type="text" id="stt-provider-extra" class="custom-input" placeholder="서비스 URL 또는 리전" autocomplete="off" oninput="saveApiSettings()">
+                    </div>
+                    <label class="selector-item api-key-item checkbox-row diarization-item">
+                        <input type="checkbox" id="stt-diarization-enabled" onchange="saveApiSettings()">
+                        <span>화자 분리 사용</span>
+                    </label>
+                </div>
+                <p id="provider-help" class="settings-note">기본 서버 API로 바로 사용할 수 있습니다. 사용량이 많거나 제한이 걸리면 개인 API 키를 연결해 계속 사용할 수 있습니다.</p>
+                <p class="settings-note">개인 API 키는 이 브라우저에만 저장되며, 음성 인식 요청 시 서버로 전달되어 해당 요청 처리에만 사용됩니다.</p>
+                <div class="api-help">
+                    <button type="button" onclick="promptGroqApiKey()" class="btn btn-pip">Groq 키 테스트 입력</button>
+                    <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq API 키 만들기</a>
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API 키 만들기</a>
+                    <a href="https://app.gladia.io/" target="_blank" rel="noopener noreferrer">Gladia 가입</a>
+                    <a href="https://portal.speechmatics.com/" target="_blank" rel="noopener noreferrer">Speechmatics 가입</a>
+                    <a href="https://cloud.ibm.com/catalog/services/speech-to-text" target="_blank" rel="noopener noreferrer">IBM Watson STT</a>
+                    <a href="https://azure.microsoft.com/products/ai-services/ai-speech" target="_blank" rel="noopener noreferrer">Azure Speech</a>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings-panel" class="settings-panel">
+            <div class="selector-box">
+                <div class="selector-item">
+                    <label>글자 크기 (Size)</label>
+                    <input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()">
+                </div>
+                <div class="selector-item">
+                    <label>글자 색상 (Color)</label>
+                    <input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()">
+                </div>
+                <div class="selector-item">
+                    <label>자막 배경색 (Background)</label>
+                    <input type="color" id="caption-bg-picker" value="#000000" oninput="updateStyle()">
+                </div>
+                <div class="selector-item">
+                    <label>배경 투명도 (Opacity)</label>
+                    <input type="range" id="caption-bg-opacity" min="0" max="0.9" step="0.05" value="0" oninput="updateStyle()">
+                </div>
+            </div>
+            <p class="settings-note">변경한 설정은 실시간 자막, 공유 보기, PIP 모드에 즉시 반영되고 이 브라우저에 저장됩니다.</p>
         </div>
 
         <div class="content-grid">
             <div class="card">
                 <div class="card-header">
                     <h3><span>📺</span> 실시간 자막</h3>
-                    <div style="display:flex; gap:8px;"><button onclick="clearTranscript()" class="btn btn-pip">초기화</button><button onclick="togglePIP()" class="btn btn-pip">PIP 모드</button></div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;"><button onclick="clearTranscript()" class="btn btn-pip">초기화</button><button onclick="toggleFocusMode()" id="focus-mode-btn" class="btn btn-pip">큰 자막</button><button onclick="togglePIP()" class="btn btn-pip">PIP 모드</button></div>
                 </div>
                 <div id="youtube-scroll" class="scroll-area"><div id="youtube-text"></div><div id="interim-text" class="interim" style="display:inline; opacity:0.6;"></div></div>
             </div>
             <div class="card" style="border-color: rgba(124, 77, 255, 0.3);">
-                <div class="card-header"><h3><span>🧠</span> AI 스마트 어시스턴트</h3></div>
+                <div class="card-header">
+                    <h3><span>🧠</span> AI 자막 정리</h3>
+                    <button type="button" onclick="toggleAiSettings()" id="ai-settings-toggle" class="btn btn-pip">AI 설정</button>
+                </div>
                 <div class="chat-container">
-                    <div id="youtube-ai" class="scroll-area">자막이 생성되면 AI에게 질문하거나 요약을 요청해보세요!</div>
+                    <div id="ai-settings-panel" class="ai-settings">
+                        <p class="ai-settings-title">AI 자막 정리 API 설정</p>
+                        <div class="selector-box">
+                            <label class="selector-item checkbox-row">
+                                <input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()">
+                                <span>개인 API 키 사용</span>
+                            </label>
+                            <div class="selector-item ai-key-item">
+                                <label>제공업체</label>
+                                <select id="ai-provider" onchange="updateAiModelOptions()">
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="groq">Groq</option>
+                                </select>
+                            </div>
+                            <div class="selector-item ai-key-item">
+                                <label>모델</label>
+                                <select id="ai-model" onchange="saveAiSettings()"></select>
+                            </div>
+                            <div class="selector-item ai-key-item">
+                                <label>API 키</label>
+                                <input type="password" id="ai-api-key" class="custom-input" placeholder="AI API 키" autocomplete="off" oninput="saveAiSettings()">
+                            </div>
+                            <div class="selector-item ai-key-item">
+                                <label>키 저장 위치</label>
+                                <select id="ai-key-storage" onchange="saveAiSettings()">
+                                    <option value="local">이 브라우저에 저장</option>
+                                    <option value="session">이번 세션만 저장</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p id="ai-mode-summary" class="settings-note">기본 AI API 사용 중 · 개인 키 선택 가능</p>
+                    </div>
+                    <div id="youtube-ai" class="scroll-area">자막이 쌓이면 핵심을 요약하거나 필요한 내용을 질문할 수 있습니다.</div>
+                    <div class="ad-slot ad-ai" aria-label="AI 요약 결과 아래 광고 영역">
+                        <ins class="adsbygoogle"
+                             style="display:block"
+                             data-ad-client="ca-pub-5553376072633585"
+                             data-ad-slot=""
+                             data-ad-format="auto"
+                             data-full-width-responsive="true"></ins>
+                    </div>
                     <div class="chat-input-box">
-                        <input type="text" id="chat-input" placeholder="질문에 답하거나 내용을 요약해줄게요..." onkeypress="if(event.keyCode==13) callAI(this.value)">
+                        <input type="text" id="chat-input" placeholder="자막 내용에 대해 질문하세요" onkeypress="if(event.keyCode==13) callAI(this.value)">
                         <button onclick="callAI(document.getElementById('chat-input').value)" class="btn-send">전송</button>
+                    </div>
+                    <div class="minutes-actions">
+                        <select id="minutes-type" class="custom-input mini-select">
+                            <option value="meeting">회의록</option>
+                            <option value="lecture">강의 노트</option>
+                            <option value="consulting">상담 기록</option>
+                        </select>
+                        <button onclick="createSmartMinutes()" class="btn btn-download">회의록 만들기</button>
+                        <button onclick="copySmartMinutes()" class="btn btn-pip">Markdown 복사</button>
+                        <button onclick="downloadSmartMinutes()" class="btn btn-pip">MD 다운로드</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="controls">
-            <button onclick="startProRec()" id="pro-start" class="btn btn-start">🚀 자막 생성 시작</button>
-            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>■ 세션 종료</button>
+            <button onclick="startProRec()" id="pro-start" class="btn btn-start">자막 시작</button>
+            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>세션 종료</button>
             <button onclick="callAI()" class="btn btn-download" style="background:var(--ai-glow); color:white; border:none;">✨ 자동 요약하기</button>
+            <button onclick="createSmartMinutes()" class="btn btn-download">📝 회의록 만들기</button>
             <button onclick="downloadTranscript()" class="btn btn-download">📥 TXT 다운로드</button>
+            <button onclick="downloadSessionRecording()" id="recording-download" class="btn btn-download" disabled>녹음 다운로드</button>
+            <button onclick="transcribeSessionRecording()" id="recording-transcribe" class="btn btn-download" disabled>최종 변환</button>
+            <button onclick="switchMode('shared')" class="btn btn-download">공유 보기</button>
+        </div>
+        <div class="ad-slot ad-controls" aria-label="다운로드 버튼 근처 광고 영역">
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-5553376072633585"
+                 data-ad-slot=""
+                 data-ad-format="horizontal"
+                 data-full-width-responsive="true"></ins>
         </div>
 
         <div id="debug-log">시스템 준비 완료.</div>
     </div>
 
-    <!-- 이공간으로 (Shared) 컨테이너 -->
+    <!-- 공유 자막 컨테이너 -->
     <div id="shared-container" class="container">
+        <div class="privacy-note">
+            <strong>공유 보기 베타</strong>
+            같은 방 번호를 사용하는 기기끼리 자막을 같이 보는 보조 기능입니다. 개인 대화나 민감한 내용은 공유하지 않는 것을 권장합니다.
+            <button onclick="switchMode('youtube')" class="btn btn-pip" style="margin-top:10px;">실시간 자막으로 돌아가기</button>
+        </div>
         <div class="selector-box">
             <div class="selector-item">
                 <label>방 번호 (Room ID)</label>
                 <div style="display:flex; gap:8px;">
-                    <input type="text" id="room-id" class="custom-input" placeholder="방 번호를 입력하거나 생성하세요">
+                    <input type="text" id="room-id" class="custom-input" placeholder="방 번호를 입력하거나 생성하세요" oninput="updateShareLink()">
                     <button onclick="generateRoomID()" class="btn btn-pip" style="white-space:nowrap; width: auto;">ID 생성</button>
                 </div>
             </div>
@@ -275,10 +294,28 @@
             </div>
         </div>
 
+        <div class="share-tools">
+            <div>
+                <div class="share-link-box">
+                    <input type="text" id="share-link" class="custom-input" readonly placeholder="방 번호를 만들면 공유 링크가 생성됩니다.">
+                    <button onclick="copyShareLink()" class="btn btn-pip" style="white-space:nowrap; width:auto;">링크 복사</button>
+                    <button onclick="copyStageLink()" class="btn btn-pip" style="white-space:nowrap; width:auto;">송출 링크</button>
+                    <button onclick="updateShareLink(true)" class="btn btn-pip" style="white-space:nowrap; width:auto;">QR 만들기</button>
+                </div>
+                <p class="settings-note">청중은 링크나 QR로 바로 받아보기 모드에 들어올 수 있습니다. 송출 모드는 프로젝터/큰 화면용입니다.</p>
+            </div>
+            <div id="qr-box" class="qr-box" aria-label="공유 자막 접속 QR 코드">
+                <img id="qr-image" alt="공유 자막 접속 QR 코드">
+            </div>
+        </div>
+
         <div class="card" style="margin-top:1.5rem; flex:1;">
             <div class="card-header">
-                <h3><span>📡</span> 실시간 중계 화면</h3>
-                <button onclick="clearSharedTranscript()" class="btn btn-pip">화면 비우기</button>
+                <h3><span>📡</span> 공유 보기</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="toggleStageMode()" id="stage-mode-btn" class="btn btn-pip">송출 모드</button>
+                    <button onclick="clearSharedTranscript()" class="btn btn-pip">화면 비우기</button>
+                </div>
             </div>
             <div id="shared-scroll" class="scroll-area" style="height: 60vh;">
                 <div id="shared-text" style="font-size: 2.5rem; color: var(--caption-color); font-weight: 800; text-align: center; line-height: 1.4;">
@@ -292,11 +329,12 @@
         </div>
     </div>
 
-    <!-- 기록 아카이브 (History) 컨테이너 -->
+    <!-- 저장 기록 컨테이너 -->
     <div id="mic-container" class="container">
         <div class="card">
             <div class="card-header">
-                <h3><span>📁</span> 저장된 기록 아카이브</h3>
+                <h3><span>📁</span> 저장된 자막 기록</h3>
+                <button onclick="clearAllHistory()" class="btn btn-pip" style="color: var(--danger); border-color: rgba(255,82,82,0.2);">전체 삭제</button>
             </div>
             <div id="history-list" class="scroll-area">
                 저장된 기록이 없습니다.
@@ -304,449 +342,30 @@
         </div>
     </div>
 
-    <section class="info-section">
-        <div class="info-grid">
-            <div class="info-card">
-                <h2>차세대 AI 실시간 자막 서비스</h2>
-                <p>V-Live Caption Pro는 최첨단 인공지능 기술을 활용하여 라이브 방송, 강의, 회의 중 발생하는 음성을 실시간으로 텍스트로 변환해주는 혁신적인 도구입니다.</p>
-                <p>특히 OpenAI의 Whisper 모델을 브라우저 내에서 직접 실행(Local AI)하거나 고성능 클라우드 엔진을 통해 지연 시간을 최소화하며 정확도를 극대화했습니다.</p>
-                <p>청각 장애인분들을 위한 보조 도구는 물론, 실시간 번역이나 기록 관리가 필요한 모든 분들에게 최상의 사용자 경험을 제공합니다.</p>
-            </div>
-            <div class="info-card">
-                <h2>빠른 시작 가이드</h2>
-                <div class="step-list">
-                    <div class="step-item">
-                        <div class="step-num">1</div>
-                        <div>
-                            <strong>입력 장치 선택</strong>
-                            <p>사용 중인 마이크 또는 시스템 사운드 입력 장치를 목록에서 선택하세요.</p>
-                        </div>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-num">2</div>
-                        <div>
-                            <strong>자막 모드 및 언어 설정</strong>
-                            <p>로컬 엔진(무제한) 또는 Pro 엔진(고정밀)을 선택하고 인식할 언어를 설정하세요.</p>
-                        </div>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-num">3</div>
-                        <div>
-                            <strong>자막 생성 시작</strong>
-                            <p>'자막 생성 시작' 버튼을 누르면 실시간으로 텍스트가 화면에 표시됩니다.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <footer>
         <div class="footer-links">
             <a href="privacy.html">개인정보처리방침</a>
             <a href="terms.html">이용약관</a>
+            <a href="guide.html">사용 가이드</a>
             <a href="mailto:support@v-live-caption.com">문의하기</a>
         </div>
-        <p class="footer-info">© 2024 V-Live Caption Pro. All rights reserved. <br> Contact: support@v-live-caption.com</p>
+        <p class="footer-info">© 2026 LiveNote. All rights reserved. <br> 로컬 자막은 브라우저에서 처리·저장되며, 클라우드/AI/공유 기능 사용 시 관련 데이터가 API로 전송될 수 있습니다. <br> Contact: support@v-live-caption.com</p>
     </footer>
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
     <video id="pip-video" autoplay playsinline muted></video>
+    <div class="ad-slot mobile-bottom-ad" aria-label="모바일 하단 배너 광고 영역">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-5553376072633585"
+             data-ad-slot=""
+             data-ad-format="horizontal"
+             data-full-width-responsive="true"></ins>
+    </div>
 
     <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-        window.WhisperPipeline = pipeline;
-        window.WhisperEnv = env;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-    </script>
-
-    <script>
-        let proInterval = null;
-        let isProRunning = false;
-        let audioContext = null;
-        let stream = null;
-        let lastLoggedText = ""; 
-        let whisperInstance = null;
-        
-        // Supabase 초기화 (익명 사용이 가능한 임시 세팅)
-        // 실제 운영시에는 본인의 프로젝트 URL과 API KEY로 변경해야 합니다.
-        let supabaseClient = null;
-        let roomSubscription = null;
-
-        const pipCanvas = document.getElementById('pip-canvas');
-        const pipVideo = document.getElementById('pip-video');
-        const pipCtx = pipCanvas.getContext('2d');
-
-        window.onload = () => {
-            const saved = localStorage.getItem('vlive_transcript');
-            if(saved) document.getElementById('youtube-text').innerText = saved;
-            updateStyle();
-            initAudio();
-        };
-
-        function generateRoomID() {
-            const id = Math.floor(1000 + Math.random() * 9000);
-            document.getElementById('room-id').value = id;
-        }
-
-        function switchMode(mode) {
-            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            const targetContainer = document.getElementById(mode + '-container');
-            if (targetContainer) targetContainer.classList.add('active');
-            
-            const navItems = document.querySelectorAll('.nav-item');
-            if (mode === 'youtube') navItems[0].classList.add('active');
-            else if (mode === 'shared') navItems[1].classList.add('active');
-            else if (mode === 'mic') navItems[2].classList.add('active');
-            
-            stopProRec();
-        }
-
-        function clearSharedTranscript() {
-            document.getElementById('shared-text').innerText = "";
-        }
-
-        async function toggleSharedConnection() {
-            const btn = document.getElementById('shared-connect-btn');
-            const status = document.getElementById('shared-status');
-            const room = document.getElementById('room-id').value;
-            const role = document.getElementById('role-select').value;
-            
-            if (!room) return alert("방 번호를 입력해주세요.");
-
-            if (btn.innerText === "연결하기") {
-                // Supabase 초기화
-                if (!supabaseClient) {
-                    try {
-                        const configRes = await fetch('/api/config');
-                        const config = await configRes.json();
-                        
-                        if (!config.supabaseUrl || !config.supabaseKey) {
-                            alert("Cloudflare 환경 변수 설정이 필요합니다 (SUPABASE_URL, SUPABASE_KEY).");
-                            return;
-                        }
-                        
-                        supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseKey);
-                    } catch (e) {
-                        alert("설정 정보를 불러오는데 실패했습니다.");
-                        return;
-                    }
-                }
-
-                btn.innerText = "연결 해제";
-                btn.classList.replace('btn-start', 'btn-stop');
-                status.innerText = `${room}번 방에 ${role === 'sender' ? '전송' : '수신'} 모드로 연결됨`;
-                status.style.color = "var(--primary)";
-
-                if (role === 'receiver') {
-                    // 수신 모드: 실시간 구독 시작
-                    roomSubscription = supabaseClient
-                        .channel(`room-${room}`)
-                        .on('broadcast', { event: 'caption' }, (payload) => {
-                            const sharedText = document.getElementById('shared-text');
-                            if (sharedText.innerText.includes("방 번호를 입력하고")) sharedText.innerText = "";
-                            sharedText.innerText += payload.payload.text + " ";
-                            // 자동 스크롤
-                            const scrollArea = document.getElementById('shared-scroll');
-                            scrollArea.scrollTop = scrollArea.scrollHeight;
-                        })
-                        .subscribe((status) => {
-                            if (status === 'SUBSCRIBED') {
-                                log(`${room}번 방 수신 시작`);
-                            }
-                        });
-                } else {
-                    // 전송 모드 채널 미리 열기
-                    roomSubscription = supabaseClient.channel(`room-${room}`).subscribe();
-                }
-            } else {
-                if (roomSubscription) {
-                    supabaseClient.removeChannel(roomSubscription);
-                    roomSubscription = null;
-                }
-                btn.innerText = "연결하기";
-                btn.classList.replace('btn-stop', 'btn-start');
-                status.innerText = "연결 대기 중...";
-                status.style.color = "var(--text-muted)";
-            }
-        }
-
-        // 텍스트를 외부로 공유하는 함수
-        async function broadcastText(text) {
-            const btn = document.getElementById('shared-connect-btn');
-            const room = document.getElementById('room-id').value;
-            const role = document.getElementById('role-select').value;
-
-            if (btn.innerText === "연결 해제" && role === 'sender' && room && supabaseClient) {
-                await supabaseClient.channel(`room-${room}`).send({
-                    type: 'broadcast',
-                    event: 'caption',
-                    payload: { text: text }
-                });
-            }
-        }
-
-        function updateStyle() {
-            const size = (localStorage.getItem('vlive_font_size') || document.getElementById('font-size-slider').value) + "rem";
-            const color = localStorage.getItem('vlive_text_color') || document.getElementById('text-color-picker').value;
-            document.documentElement.style.setProperty('--caption-size', size);
-            document.documentElement.style.setProperty('--caption-color', color);
-            localStorage.setItem('vlive_font_size', parseFloat(size));
-            localStorage.setItem('vlive_text_color', color);
-        }
-
-        function clearTranscript() {
-            if(confirm("기록을 삭제할까요?")) {
-                document.getElementById('youtube-text').innerText = "";
-                document.getElementById('interim-text').innerText = "";
-                localStorage.removeItem('vlive_transcript');
-                log("기록 초기화 완료.");
-            }
-        }
-
-        function downloadTranscript() {
-            const text = document.getElementById('youtube-text').innerText;
-            if(!text) return alert("내용이 없습니다.");
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `V-Live_자막.txt`;
-            a.click();
-        }
-
-        const log = (msg, isError = false) => {
-            const box = document.getElementById('debug-log');
-            if (!box) return;
-            const color = isError ? '#FF5252' : '#00E676';
-            box.innerHTML += `<span style="color:${color}">[${new Date().toLocaleTimeString()}] ${msg}</span><br>`;
-            box.scrollTop = box.scrollHeight;
-        };
-
-        const setStatus = (status, active = false) => {
-            const dot = document.getElementById('status-dot');
-            const text = document.getElementById('status-text');
-            if (text) text.innerText = status.toUpperCase();
-            if (dot) { if(active) dot.classList.add('active'); else dot.classList.remove('active'); }
-        };
-
-        function cleanText(text) {
-            let cleaned = text.trim();
-            if(!cleaned) return "";
-            const words = cleaned.split(/\s+/);
-            const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
-            cleaned = dedupedWords.join(' ');
-            const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
-            if(noise.some(n => cleaned.toLowerCase() === n)) return "";
-            if(cleaned === lastLoggedText) return ""; 
-            lastLoggedText = cleaned;
-            return cleaned;
-        }
-
-        async function initAudio() {
-            try {
-                if (audioContext && audioContext.state !== 'closed') await audioContext.close();
-                const deviceSelect = document.getElementById('device-select');
-                if (!deviceSelect) return;
-                const deviceId = deviceSelect.value;
-                const constraints = { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } };
-                if(stream) stream.getTracks().forEach(track => track.stop());
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const mics = devices.filter(d => d.kind === 'audioinput');
-                const currentVal = deviceSelect.value;
-                deviceSelect.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === currentVal ? 'selected' : ''}>${m.label || '마이크'}</option>`).join('');
-                
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioContext.createMediaStreamSource(stream);
-                const analyser = audioContext.createAnalyser();
-                analyser.fftSize = 512;
-                source.connect(analyser);
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                
-                function draw() {
-                    if(!audioContext || audioContext.state === 'closed') return;
-                    analyser.getByteFrequencyData(data);
-                    let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
-                    let avg = Math.round((sum / data.length) * 4.8); 
-                    const vFill = document.getElementById('v-fill');
-                    const vLabel = document.getElementById('v-label');
-                    if (vFill) vFill.style.width = Math.min(100, avg) + "%";
-                    if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
-                    updatePipCanvas();
-                    requestAnimationFrame(draw);
-                }
-                draw();
-                setStatus("준비 완료", false);
-            } catch(e) { log("마이크 연결 실패", true); }
-        }
-
-        function updatePipCanvas() {
-            if (!pipCtx) return;
-            pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
-            pipCtx.fillStyle = document.getElementById('text-color-picker').value;
-            const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
-            pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
-            const youtubeText = document.getElementById('youtube-text');
-            const fullText = (youtubeText ? youtubeText.innerText : "").trim();
-            const words = fullText.split(' ').slice(-8).join(' ');
-            pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
-        }
-
-        async function togglePIP() {
-            try {
-                if (document.pictureInPictureElement) await document.exitPictureInPicture();
-                else { if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream(); await pipVideo.play(); await pipVideo.requestPictureInPicture(); }
-            } catch (e) { log("PIP 에러", true); }
-        }
-
-        async function startProRec() {
-            if(!stream) await initAudio();
-            const engine = document.getElementById('engine-select').value;
-            const lang = document.getElementById('lang-select').value;
-            isProRunning = true;
-            document.getElementById('pro-start').disabled = true;
-            document.getElementById('pro-stop').disabled = false;
-            setStatus("캡처 중", true);
-
-            if (engine === 'local-whisper') {
-                startLocalWhisper(lang);
-            } else {
-                startGroqWhisper(lang);
-            }
-        }
-
-        async function startLocalWhisper(lang) {
-            log("[로컬 AI] 엔진 초기화 시작...");
-            document.getElementById('model-loading').style.display = 'block';
-            try {
-                if (!whisperInstance) {
-                    whisperInstance = await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
-                        device: 'webgpu', 
-                        progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
-                    }).catch(async () => {
-                        return await window.WhisperPipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
-                            progress_callback: (p) => { if (p.status === 'progress') document.getElementById('model-loading-fill').style.width = p.progress + "%"; }
-                        });
-                    });
-                }
-                document.getElementById('model-loading').style.display = 'none';
-                log("[로컬 AI] 가동 완료.");
-
-                proInterval = setInterval(async () => {
-                    if (!isProRunning) return;
-                    const recorder = new MediaRecorder(stream);
-                    const chunks = [];
-                    recorder.ondataavailable = e => chunks.push(e.data);
-                    recorder.onstop = async () => {
-                        const blob = new Blob(chunks, { type: 'audio/webm' });
-                        const audioData = await blob.arrayBuffer();
-                        const internalAudioCtx = new AudioContext({ sampleRate: 16000 });
-                        const decoded = await internalAudioCtx.decodeAudioData(audioData);
-                        const audioFloat32 = decoded.getChannelData(0);
-
-                        const result = await whisperInstance(audioFloat32, { 
-                            language: lang === 'auto' ? null : lang, 
-                            task: 'transcribe',
-                            return_timestamps: false,
-                            chunk_length_s: 30,
-                            stride_length_s: 5
-                        });
-
-                        const cleaned = cleanText(result.text);
-                        if (cleaned && cleaned.length > 1) {
-                            const el = document.getElementById('youtube-text');
-                            el.innerText += cleaned + " ";
-                            localStorage.setItem('vlive_transcript', el.innerText);
-                            document.getElementById('youtube-scroll').scrollTop = 999999;
-                            
-                            // 실시간 공유 중이면 텍스트 전송
-                            broadcastText(cleaned);
-                        }
-                        await internalAudioCtx.close();
-                    };
-                    recorder.start();
-                    setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
-                }, 3500);
-            } catch (e) { log("로컬 에러: " + e.message, true); }
-        }
-
-        function startGroqWhisper(lang) {
-            log("[고정밀 Pro] 클라우드 엔진 가동");
-            proInterval = setInterval(async () => {
-                if (!isProRunning) return;
-                const recorder = new MediaRecorder(stream);
-                const chunks = [];
-                recorder.ondataavailable = e => chunks.push(e.data);
-                recorder.onstop = async () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    if (blob.size < 2500) return;
-                    const formData = new FormData();
-                    formData.append('file', blob, 'audio.webm');
-                    formData.append('model', 'whisper-large-v3');
-                    if (lang !== 'auto') formData.append('language', lang);
-                    try {
-                        const res = await fetch('/api/stt', { method: 'POST', body: formData });
-                        const data = await res.json();
-                        if (res.ok && data.text) {
-                            const cleaned = cleanText(data.text);
-                            if (cleaned) {
-                                const el = document.getElementById('youtube-text');
-                                el.innerText += cleaned + " ";
-                                localStorage.setItem('vlive_transcript', el.innerText);
-                                document.getElementById('youtube-scroll').scrollTop = 999999;
-                                
-                                // 실시간 공유 중이면 텍스트 전송
-                                broadcastText(cleaned);
-                            }
-                        }
-                    } catch (e) {}
-                };
-                recorder.start();
-                setTimeout(() => { if(recorder.state === 'recording') recorder.stop(); }, 3000);
-            }, 3500);
-        }
-
-        function stopProRec() { 
-            isProRunning = false; clearInterval(proInterval);
-            const startBtn = document.getElementById('pro-start');
-            const stopBtn = document.getElementById('pro-stop');
-            if (startBtn) startBtn.disabled = false; 
-            if (stopBtn) stopBtn.disabled = true;
-            const interimText = document.getElementById('interim-text');
-            if (interimText) interimText.innerText = ""; 
-            setStatus("IDLE", false);
-            const modelLoading = document.getElementById('model-loading');
-            if (modelLoading) modelLoading.style.display = 'none';
-        }
-
-        async function callAI(question = null) {
-            const textContent = document.getElementById('youtube-text');
-            const text = textContent ? textContent.innerText : "";
-            if (text.length < 5) return log("데이터 부족", true);
-            const aiArea = document.getElementById('youtube-ai');
-            if (!aiArea) return;
-            if (question) {
-                aiArea.innerHTML += `<div style="margin-top:10px; color:var(--primary); font-weight:bold;">Q: ${question}</div>`;
-                document.getElementById('chat-input').value = "";
-            } else {
-                aiArea.innerHTML = "분석 중...";
-            }
-            try {
-                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, question }) });
-                const data = await res.json();
-                const result = data.result || "결과 오류";
-                if (question) aiArea.innerHTML += `<div style="margin-bottom:10px; color:#fff;">A: ${result}</div>`;
-                else aiArea.innerHTML = result;
-                aiArea.scrollTop = aiArea.scrollHeight;
-            } catch (e) { log("AI 오류", true); }
-        }
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 자막 사용 가이드 | LiveNote</title>
+    <meta name="description" content="LiveNote 사용 가이드입니다. 실시간 자막, 무료 자막 도구, 청각장애 자막 보조, AI 요약, 공유 보기, 지난 자막 사용 방법을 안내합니다.">
+    <meta name="keywords" content="실시간 자막 사용법, 무료 자막 도구, 청각장애 자막, AI 자막 가이드, 회의 자막, 강의 자막">
+    <meta name="google-adsense-account" content="ca-pub-5553376072633585">
+    <style>
+        :root { --primary:#00C853; --bg:#0A0A0B; --surface:#161618; --text:#F5F5F7; --muted:#9A9AA0; --border:rgba(255,255,255,0.12); }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.75; }
+        header, main, footer { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+        header { padding-top: 42px; padding-bottom: 24px; }
+        a { color: var(--primary); text-decoration: none; }
+        h1 { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.15; margin: 18px 0 16px; letter-spacing: 0; }
+        h2 { margin-top: 42px; color: var(--primary); font-size: 1.35rem; }
+        h3 { margin-top: 24px; font-size: 1.05rem; }
+        p, li { color: var(--muted); }
+        .back { font-weight: 800; }
+        .lead { font-size: 1.05rem; max-width: 780px; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px; margin: 18px 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+        .step { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+        .step strong { color: var(--text); display: block; margin-bottom: 8px; }
+        footer { border-top: 1px solid var(--border); margin-top: 54px; padding-top: 24px; padding-bottom: 36px; color: var(--muted); font-size: 0.85rem; }
+        @media (max-width: 640px) { header { padding-top: 28px; } .panel { padding: 18px; } }
+    </style>
+</head>
+<body>
+    <header>
+        <a class="back" href="index.html">LiveNote로 돌아가기</a>
+        <h1>실시간 AI 자막 사용 가이드</h1>
+        <p class="lead">LiveNote는 마이크 입력을 실시간 자막으로 바꾸는 무료 자막 도구입니다. 회의 기록, 강의 내용 확인, 라이브 방송 자막 확인처럼 음성을 바로 텍스트로 보고 싶은 상황에 맞춰 만들었습니다. 별도의 설치 없이 브라우저에서 바로 실행됩니다.</p>
+    </header>
+
+    <main>
+        <section class="panel">
+            <h2>핵심 안내</h2>
+            <div class="grid">
+                <div class="step">
+                    <strong>로컬 우선</strong>
+                    <p>민감한 대화는 브라우저 처리 모드로 사용해 외부 전송을 줄일 수 있습니다.</p>
+                </div>
+                <div class="step">
+                    <strong>읽기 편한 자막</strong>
+                    <p>글자 크기, 색상, 배경색, 배경 투명도를 조절해 상황에 맞게 볼 수 있습니다.</p>
+                </div>
+                <div class="step">
+                    <strong>기록과 공유</strong>
+                    <p>자막을 지난 자막에 남기고, 필요한 경우 TXT로 내려받거나 보조 기능으로 다른 기기와 공유할 수 있습니다.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>서비스 소개</h2>
+            <p>LiveNote는 브라우저에서 음성을 텍스트로 변환해 회의, 온라인 강의, 라이브 방송, 개인 메모를 더 쉽게 확인하도록 돕는 무료 실시간 자막 도구입니다.</p>
+            <p>로컬 자막 모드는 모델을 브라우저에서 실행하므로 네트워크 전송을 줄일 수 있습니다. 고정밀 클라우드 자막 모드는 서버 API를 통해 더 안정적인 인식 결과를 받을 수 있지만, 음성 조각이 외부 API로 전송됩니다.</p>
+            <p>청각장애 자막 보조, 강의 자막 확인, 회의 내용 기록처럼 즉시 텍스트 확인이 필요한 상황을 위해 만들었습니다. 생성된 자막은 브라우저에 저장되며 TXT 파일로 내려받을 수 있습니다.</p>
+        </section>
+
+        <section class="panel">
+            <h2>빠른 시작 가이드</h2>
+            <div class="grid">
+                <div class="step">
+                    <strong>1. 입력 장치 선택</strong>
+                    <p>사용 중인 마이크 또는 시스템 사운드 입력 장치를 목록에서 선택하세요.</p>
+                </div>
+                <div class="step">
+                    <strong>2. 자막 모드 및 언어 설정</strong>
+                    <p>브라우저 처리 방식 또는 클라우드 처리 방식을 선택하고 인식할 언어를 설정하세요.</p>
+                </div>
+                <div class="step">
+                    <strong>3. 자막 생성 시작</strong>
+                    <p>자막 시작 버튼을 누르면 실시간으로 텍스트가 화면에 표시됩니다.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>이런 상황에서 사용할 수 있습니다</h2>
+            <div class="grid">
+                <div class="step"><strong>강의와 세미나</strong><p>말이 빠르거나 강의실 소리가 작을 때 실시간 자막으로 핵심 내용을 놓치지 않도록 돕습니다.</p></div>
+                <div class="step"><strong>직장 회의</strong><p>회의 중 들리지 않은 내용을 자막과 지난 자막으로 다시 확인하고, AI 요약으로 핵심을 정리합니다.</p></div>
+                <div class="step"><strong>병원과 상담</strong><p>진료 설명이나 상담 내용을 텍스트로 확인해 중요한 안내를 놓치는 일을 줄입니다.</p></div>
+                <div class="step"><strong>라이브 방송과 영상</strong><p>자막이 없는 실시간 방송, 온라인 설명회, 웨비나 내용을 보조 자막으로 확인할 수 있습니다.</p></div>
+                <div class="step"><strong>가족 대화</strong><p>집이나 외출 중 대화를 더 편하게 확인할 수 있도록 큰 자막 보기와 PIP 모드를 제공합니다.</p></div>
+                <div class="step"><strong>외국어 학습</strong><p>한국어와 영어 음성을 텍스트로 보며 발화 내용을 확인하고 학습 기록으로 저장할 수 있습니다.</p></div>
+            </div>
+        </section>
+
+        <section>
+            <h2>접근성 설정</h2>
+            <ul>
+                <li><strong>글자 크기, 색상, 배경:</strong> 대비가 큰 조합을 선택하면 멀리서도 자막을 읽기 쉽습니다.</li>
+                <li><strong>큰 자막 보기:</strong> 자막만 크게 띄워 강의실, 회의실, 가족 대화처럼 멀리서 봐야 하는 상황에 활용할 수 있습니다.</li>
+                <li><strong>PIP 모드:</strong> 다른 창 위에 작은 자막 창을 띄워 영상이나 회의 화면과 함께 볼 수 있습니다.</li>
+                <li><strong>지난 자막:</strong> 실시간으로 놓친 내용은 지난 자막 탭에서 다시 읽거나 TXT 파일로 내려받을 수 있습니다.</li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>청각장애·난청 사용자 피드백</h2>
+            <p>이 앱은 실제로 자막이 필요한 상황에서 출발했습니다. 글자 크기, 색상, 지연, 공유 방식처럼 사용 중 불편한 점이 있으면 <a href="mailto:support@v-live-caption.com">support@v-live-caption.com</a>으로 알려주세요.</p>
+        </section>
+
+        <section>
+            <h2>자주 묻는 질문 (FAQ)</h2>
+            <h3>LiveNote는 정말 무료인가요?</h3>
+            <p>네, 핵심 기능은 무료로 사용할 수 있도록 만들었습니다. 클라우드 기반 고정밀 자막 및 AI 요약 기능은 외부 API 상태와 운영 비용에 따라 제한될 수 있습니다.</p>
+            <h3>청각장애인을 위한 자막 보조 도구로 적합한가요?</h3>
+            <p>실시간 강의, 직장 내 회의, 온라인 영상 시청 시 음성을 시각화하여 정보 접근성을 높이는 데 도움을 줄 수 있습니다. 다만 AI 자막은 오류가 있을 수 있으므로 중요한 내용은 원문과 함께 확인해 주세요.</p>
+            <h3>자막 데이터의 개인정보 보호는 어떻게 되나요?</h3>
+            <p>로컬 자막 모드를 사용하면 음성 데이터가 브라우저 밖으로 나가지 않습니다. 클라우드 모드, AI 요약, 공유 보기 사용 시에는 기능 처리를 위해 데이터가 외부 API로 전송될 수 있습니다.</p>
+            <h3>자막이 저장되는 위치와 기록 관리 방법</h3>
+            <p>생성된 자막은 사용자의 브라우저 내 지난 자막 탭에 자동으로 보관됩니다. 이는 기기 내부의 localStorage를 사용하므로, 브라우저 데이터를 삭제하면 함께 지워질 수 있습니다.</p>
+            <h3>유튜브나 화상회의 소리도 자막으로 볼 수 있나요?</h3>
+            <p>PC 환경에서 시스템 오디오 입력 장치를 선택하면 컴퓨터에서 나오는 소리를 실시간 자막으로 변환할 수 있습니다. 기기와 브라우저 설정에 따라 지원 여부가 달라질 수 있습니다.</p>
+            <h3>공유 보기 기능은 어떤 상황에서 쓰이나요?</h3>
+            <p>강연자가 휴대폰으로 마이크 입력을 하고, 청중이 각자의 태블릿이나 노트북에서 자막을 확인하고 싶을 때 유용한 보조 기능입니다.</p>
+            <h3>지원하는 브라우저와 기기 사양이 궁금합니다.</h3>
+            <p>최신 Chrome 또는 Edge를 권장합니다. 로컬 AI 모드는 기기의 CPU/GPU 성능에 따라 인식 속도에 차이가 있을 수 있습니다.</p>
+            <h3>마이크 인식이 안 돼요.</h3>
+            <p>브라우저 주소창의 권한 설정에서 마이크 허용 상태를 확인하세요. 다른 프로그램이 마이크를 독점 사용 중인지도 확인해야 합니다.</p>
+        </section>
+    </main>
+
+    <footer>
+        <a href="index.html">홈</a> · <a href="privacy.html">개인정보처리방침</a> · <a href="terms.html">이용약관</a>
+        <p>© 2026 LiveNote. 실시간 자막과 무료 자막 도구를 더 접근성 높은 방식으로 제공하기 위한 프로젝트입니다.</p>
+    </footer>
+</body>
+</html>

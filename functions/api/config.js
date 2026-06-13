@@ -1,17 +1,32 @@
-export async function onRequestGet(context) {
-  const { env } = context;
+const jsonHeaders = (request, env) => {
+  const origin = request.headers.get("Origin") || "";
+  const selfOrigin = new URL(request.url).origin;
+  const allowedOrigins = (env.ALLOWED_ORIGINS || selfOrigin)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowOrigin = allowedOrigins.includes(origin) ? origin : selfOrigin;
 
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+    "Content-Type": "application/json; charset=utf-8",
   };
+};
 
-  // Cloudflare 대시보드에 등록된 환경 변수를 읽어옵니다.
+export async function onRequestOptions(context) {
+  return new Response(null, { headers: jsonHeaders(context.request, context.env) });
+}
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+
   return new Response(JSON.stringify({
     supabaseUrl: env.SUPABASE_URL || "",
-    supabaseKey: env.SUPABASE_KEY || ""
+    supabaseAnonKey: env.SUPABASE_ANON_KEY || "",
   }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
+    headers: jsonHeaders(request, env),
   });
 }
