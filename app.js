@@ -20,6 +20,7 @@ let isProcessingChunk = false;
 let pipActive = false;
 let lastTranslationAt = 0;
 let translationInFlight = false;
+let cloudBackoffUntil = 0;
 let toastTimer = null;
 const translationCache = new Map();
 const HISTORY_KEY = 'vlive_history';
@@ -30,7 +31,7 @@ const HISTORY_SAVE_INTERVAL_MS = 15000;
 const LOCAL_WHISPER_MODEL = "Xenova/whisper-tiny";
 const FALLBACK_WHISPER_MODEL = "Xenova/whisper-base";
 const LOCAL_MIN_RMS = 0.008;
-const CAPTURE_TIMING = { localRecordMs: 1700, cloudRecordMs: 2400, restartDelayMs: 50 };
+const CAPTURE_TIMING = { localRecordMs: 1700, cloudRecordMs: 3200, restartDelayMs: 200 };
 const STT_PROVIDER_MODELS = {
     groq: [
         { value: "whisper-large-v3", label: "whisper-large-v3" },
@@ -987,9 +988,19 @@ async function requestStt(formData) {
     }
     const data = await res.json();
     if (!res.ok) {
-        throw new Error(data.error || "클라우드 자막 요청 실패");
+        const error = new Error(data.error || "클라우드 자막 요청 실패");
+        error.status = res.status;
+        throw error;
     }
     return data;
+}
+
+function getCloudRetryDelayMs(error) {
+    const message = String(error?.message || "");
+    const retryMatch = message.match(/(\d+(?:\.\d+)?)\s*초\s*후/);
+    if (retryMatch) return Math.ceil(Number(retryMatch[1]) * 1000) + 800;
+    if (error?.status === 429 || message.includes("rate") || message.includes("요청 속도 제한")) return 4500;
+    return 0;
 }
 
 async function transcribeSessionRecording() {
@@ -1553,6 +1564,11 @@ function startGroqWhisper(lang) {
     showToast("클라우드 자막 요청을 준비했습니다.");
     const captureCloudChunk = async () => {
         if (!isProRunning) return;
+        const waitMs = cloudBackoffUntil - Date.now();
+        if (waitMs > 0) {
+            proInterval = setTimeout(captureCloudChunk, waitMs);
+            return;
+        }
         isProcessingChunk = true;
         const sttSettings = getSttRequestSettings();
         try {
@@ -1587,7 +1603,13 @@ function startGroqWhisper(lang) {
             }
         } catch (e) {
             log("클라우드 자막 연결 오류: " + e.message, true);
-            showToast(e.message || "클라우드 자막 연결 오류가 발생했습니다.", "error", 5200);
+            const retryDelay = getCloudRetryDelayMs(e);
+            if (retryDelay) {
+                cloudBackoffUntil = Date.now() + retryDelay;
+                showToast(`요청 제한에 걸려 ${Math.ceil(retryDelay / 1000)}초 후 다시 시도합니다.`, "error", 5200);
+            } else {
+                showToast(e.message || "클라우드 자막 연결 오류가 발생했습니다.", "error", 5200);
+            }
         } finally {
             isProcessingChunk = false;
             if (isProRunning) proInterval = setTimeout(captureCloudChunk, CAPTURE_TIMING.restartDelayMs);
