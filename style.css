@@ -246,6 +246,8 @@ footer {
 .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
 .footer-links a:hover { color: var(--primary); }
 .footer-info { color: #555; font-size: 0.75rem; }
+.email-link { color: inherit; text-decoration: none; font-weight: 800; }
+.email-link:hover { color: var(--primary); }
 
 .info-section { padding: 4rem 5%; background: var(--surface); margin-top: 2rem; border-top: 1px solid var(--border); }
 .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; max-width: 1200px; margin: 0 auto; }
