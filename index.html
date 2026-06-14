@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LiveNote | 실시간 AI 자막 도구</title>
-    <meta name="description" content="브라우저에서 마이크 음성을 실시간으로 인식하여 자막을 생성하는 무료 AI 자막 도구입니다. 청각장애인 자막 지원, AI 요약, 자막 공유 기능을 제공하며 별도의 설치 없이 바로 사용 가능합니다.">
-    <meta name="keywords" content="실시간 자막, 무료 자막 도구, 청각장애 자막, AI 자막, 실시간 음성 자막, 화상회의 자막, 강의 자막, 자막 공유, 배리어프리">
-    <meta property="og:title" content="LiveNote | 실시간 AI 자막 및 요약 서비스">
-    <meta property="og:description" content="마이크 음성을 실시간 자막으로 변환하고 AI로 요약해주는 무료 웹 서비스입니다. 청각장애 자막 보조로 활용해 보세요.">
+    <title>LiveNote | Live lecture captions and AI class materials</title>
+    <meta name="description" content="Show live captions on screen and by link during class, then create lecture notes, SRT/VTT captions, and PDF materials in the browser.">
+    <meta name="keywords" content="live lecture captions, classroom captions, AI lecture notes, SRT captions, VTT captions, caption sharing, accessibility captions">
+    <meta property="og:title" content="LiveNote | Live lecture captions and AI class materials">
+    <meta property="og:description" content="Share captions by link during class, then create lecture notes and caption files after the session.">
     <meta property="og:type" content="website">
     <meta name="google-adsense-account" content="ca-pub-5553376072633585">
     <link rel="canonical" href="/">
@@ -19,19 +19,40 @@
     <div id="model-loading"><div id="model-loading-fill"></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <header>
+    <header class="topbar">
+        <div class="topbar-inner">
         <div class="brand">
-            <h1>LiveNote</h1>
-            <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
+            <span class="brand-mark" aria-hidden="true">L</span>
+            <span class="brand-copy">
+                <h1>LiveNote</h1>
+                <span>Live captions and AI notes</span>
+            </span>
         </div>
-        <div class="volume-meter">
-            <span id="v-title" style="font-size: 0.65rem; font-weight:700; color:var(--text-muted);">마이크 감도</span>
-            <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
-            <span id="v-label" style="font-size: 0.65rem; font-weight:800; min-width:25px;">0%</span>
+        <nav class="app-nav">
+            <div class="nav-item active" onclick="switchMode('youtube')">실시간 자막</div>
+            <div class="nav-item" onclick="switchMode('mic')">지난 자막</div>
+            <a class="nav-item" href="guide.html">사용 가이드</a>
+        </nav>
+        <div class="topbar-actions">
+            <div id="plan-badge" class="plan-badge">Free</div>
+            <button type="button" onclick="activatePremiumDemo()" id="premium-activate-btn" class="btn premium-nav-btn">Premium</button>
+            <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
+            <div class="volume-meter">
+                <span id="v-title" class="meter-title">마이크 감도</span>
+                <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
+                <span id="v-label" class="meter-value">0%</span>
+            </div>
+            <select id="lang-select" class="top-language-select" title="Language" aria-label="Language">
+                <option value="en" selected>English</option>
+                <option value="ko">Korean</option>
+                <option value="ja">Japanese</option>
+            </select>
+            <button type="button" onclick="openMyPage()" id="mypage-btn" class="btn account-btn">마이페이지</button>
+        </div>
         </div>
     </header>
 
-    <nav>
+    <nav class="app-nav">
         <div class="nav-item active" onclick="switchMode('youtube')">실시간 자막</div>
         <div class="nav-item" onclick="switchMode('mic')">지난 자막</div>
         <a class="nav-item" href="guide.html">사용 가이드</a>
@@ -42,8 +63,8 @@
         <section class="intro-panel" aria-labelledby="intro-title">
             <div>
                 <div class="origin-badge">LiveNote</div>
-                <h2 id="intro-title">실시간 AI 자막</h2>
-                <p>마이크로 들어오는 소리를 바로 자막으로 확인하세요.</p>
+                <h2 id="intro-title">강의 실시간 자막 송출</h2>
+                <p>강의 중 자막을 화면과 링크로 공유하고, 종료 후 강의노트와 SRT/VTT/PDF를 만듭니다.</p>
             </div>
         </section>
         <div class="selector-box">
@@ -62,42 +83,88 @@
                 </select>
             </div>
             <div class="selector-item">
-                <div class="selector-inline">
-                    <div>
-                        <label>인식 언어</label>
-                        <select id="lang-select">
-                            <option value="auto" selected>언어 자동 감지</option>
-                            <option value="ko">한국어 (Korean)</option>
-                            <option value="en">영어 (English)</option>
-                        </select>
-                    </div>
-                    <button type="button" onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip">환경설정</button>
-                </div>
+                <label>Settings</label>
+                <button type="button" onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip settings-icon-btn" title="Language and caption settings" aria-label="Language and caption settings">⚙️</button>
             </div>
             <div class="selector-item">
                 <label>번역 언어</label>
                 <select id="translation-target">
                     <option value="none" selected>번역 안 함</option>
-                    <option value="ko">한국어로 번역</option>
-                    <option value="en">영어로 번역</option>
+                    <option value="en">English</option>
+                    <option value="ko">Korean</option>
+                    <option value="ja">Japanese</option>
                 </select>
             </div>
+            <div class="selector-item lesson-title-item">
+                <label>수업명</label>
+                <input type="text" id="lesson-title" class="custom-input" placeholder="예: 중3 과학 2단원" oninput="saveLessonMeta()">
+            </div>
         </div>
+        <p class="lesson-note">수업명은 지난 자막에 함께 저장됩니다. 화자 구분이나 기관 자체 키는 고급 설정에서 선택할 수 있습니다.</p>
+
+        <section id="premium-card" class="premium-card" aria-label="Premium usage and upgrade">
+            <div>
+                <strong>강의자료 Premium 실험</strong>
+                <p id="premium-meter">클라우드 0분/10분 · AI 0/3 · 최종변환 0/1</p>
+            </div>
+            <div class="premium-actions">
+                <button type="button" onclick="activatePremiumDemo()" class="btn btn-start">강의 Premium 보기</button>
+                <button type="button" onclick="resetFreePlanDemo()" class="btn btn-pip">Free로 보기</button>
+                <button type="button" onclick="downloadSrtCaption()" class="btn btn-pip">SRT</button>
+                <button type="button" onclick="downloadVttCaption()" class="btn btn-pip">VTT</button>
+            </div>
+        </section>
+
+        <section class="lecture-flow" aria-label="LiveNote lecture workflow">
+            <div>
+                <span>1</span>
+                <strong>실시간 자막</strong>
+                <p>마이크 소리를 바로 큰 자막으로 보여줍니다.</p>
+            </div>
+            <div>
+                <span>2</span>
+                <strong>학생 링크 공유</strong>
+                <p>QR 링크로 학생 화면에 자막을 보냅니다.</p>
+            </div>
+            <div>
+                <span>3</span>
+                <strong>강의자료 생성</strong>
+                <p>강의노트와 SRT/VTT/PDF로 정리합니다.</p>
+            </div>
+        </section>
+
+        <section class="sample-output" aria-label="강의자료 샘플">
+            <div class="sample-copy">
+                <strong>샘플 결과물</strong>
+                <p>강의가 끝나면 자막 원문을 복습자료 형태로 정리합니다.</p>
+                <button type="button" onclick="loadSampleLesson()" class="btn btn-pip">샘플 적용</button>
+            </div>
+            <div class="sample-card">
+                <span>강의노트</span>
+                <strong>중3 과학: 전류와 전압</strong>
+                <p>핵심 개념 3개, 헷갈리는 용어, 복습 질문, 다음 수업 과제를 한 문서로 정리합니다.</p>
+            </div>
+            <div class="sample-card">
+                <span>자막 파일</span>
+                <strong>SRT / VTT</strong>
+                <p>녹화 강의 업로드에 바로 쓰는 시간표시 자막 파일을 만듭니다.</p>
+            </div>
+        </section>
 
         <div id="api-settings" class="api-settings">
             <div class="api-summary">
                 <div class="api-summary-text">
                     <strong>클라우드 고정밀</strong>
-                    <span id="api-mode-summary">기본 서버 API 사용 중 · 개인 키 선택 가능</span>
+                    <span id="api-mode-summary">LiveNote 서버 크레딧 사용 중 · API 키 설정 없이 사용</span>
                 </div>
-                <button type="button" onclick="toggleApiDetail()" id="api-detail-toggle" class="btn btn-pip">API 설정</button>
+                <button type="button" onclick="toggleApiDetail()" id="api-detail-toggle" class="btn btn-pip">고급 설정</button>
             </div>
             <div id="api-detail" class="api-detail">
-                <p class="api-settings-title">클라우드 자막 API 설정</p>
+                <p class="api-settings-title">고급 API 설정</p>
                 <div class="selector-box">
                     <label class="selector-item checkbox-row">
                         <input type="checkbox" id="personal-api-enabled" onchange="togglePersonalApiSettings()">
-                        <span>개인 API 키 사용</span>
+                        <span>내 API 키 사용</span>
                     </label>
                     <div class="selector-item api-key-item">
                         <label>제공업체</label>
@@ -134,8 +201,8 @@
                         <span>화자 분리 사용</span>
                     </label>
                 </div>
-                <p id="provider-help" class="settings-note">기본 서버 API로 바로 사용할 수 있습니다. 사용량이 많거나 제한이 걸리면 개인 API 키를 연결해 계속 사용할 수 있습니다.</p>
-                <p class="settings-note">개인 API 키는 이 브라우저에만 저장되며, 음성 인식 요청 시 서버로 전달되어 해당 요청 처리에만 사용됩니다.</p>
+                <p id="provider-help" class="settings-note">Free/Premium은 LiveNote 서버 크레딧으로 바로 사용할 수 있습니다. 개발자나 기관만 자체 API 키를 선택하세요.</p>
+                <p class="settings-note">내 API 키를 쓰면 LiveNote 사용량 한도 대신 해당 API 제공업체 비용이 직접 발생합니다. 키는 이 브라우저에만 저장됩니다.</p>
                 <div class="api-help">
                     <button type="button" onclick="promptGroqApiKey()" class="btn btn-pip">Groq 키 테스트 입력</button>
                     <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq API 키 만들기</a>
@@ -180,16 +247,16 @@
             </div>
             <div class="card" style="border-color: rgba(124, 77, 255, 0.3);">
                 <div class="card-header">
-                    <h3><span>🧠</span> AI 자막 정리</h3>
-                    <button type="button" onclick="toggleAiSettings()" id="ai-settings-toggle" class="btn btn-pip">AI 설정</button>
+                    <h3><span>📚</span> 강의자료</h3>
+                    <button type="button" onclick="toggleAiSettings()" id="ai-settings-toggle" class="btn btn-pip">자료 설정</button>
                 </div>
                 <div class="chat-container">
                     <div id="ai-settings-panel" class="ai-settings">
-                        <p class="ai-settings-title">AI 자막 정리 API 설정</p>
+                        <p class="ai-settings-title">강의자료 고급 API 설정</p>
                         <div class="selector-box">
                             <label class="selector-item checkbox-row">
                                 <input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()">
-                                <span>개인 API 키 사용</span>
+                                <span>내 API 키 사용</span>
                             </label>
                             <div class="selector-item ai-key-item">
                                 <label>제공업체</label>
@@ -215,9 +282,9 @@
                                 </select>
                             </div>
                         </div>
-                        <p id="ai-mode-summary" class="settings-note">기본 AI API 사용 중 · 개인 키 선택 가능</p>
+                        <p id="ai-mode-summary" class="settings-note">LiveNote 서버 크레딧 사용 중 · API 키 설정 없이 사용</p>
                     </div>
-                    <div id="youtube-ai" class="scroll-area">자막이 쌓이면 핵심을 요약하거나 필요한 내용을 질문할 수 있습니다.</div>
+                    <div id="youtube-ai" class="scroll-area">강의가 끝나면 핵심 요약, 복습 포인트, 과제 힌트를 자료로 정리합니다.</div>
                     <div class="ad-slot ad-ai" aria-label="AI 요약 결과 아래 광고 영역">
                         <ins class="adsbygoogle"
                              style="display:block"
@@ -233,12 +300,13 @@
                     <div class="minutes-actions">
                         <select id="minutes-type" class="custom-input mini-select">
                             <option value="meeting">회의록</option>
-                            <option value="lecture">강의 노트</option>
+                            <option value="lecture" selected>강의 노트</option>
                             <option value="consulting">상담 기록</option>
                         </select>
-                        <button onclick="createSmartMinutes()" class="btn btn-download">회의록 만들기</button>
+                        <button onclick="createSmartMinutes()" class="btn btn-download">자료 만들기</button>
                         <button onclick="copySmartMinutes()" class="btn btn-pip">Markdown 복사</button>
                         <button onclick="downloadSmartMinutes()" class="btn btn-pip">MD 다운로드</button>
+                        <button onclick="downloadSmartMinutesPdf()" class="btn btn-pip">PDF</button>
                     </div>
                 </div>
             </div>
@@ -247,12 +315,12 @@
         <div class="controls">
             <button onclick="startProRec()" id="pro-start" class="btn btn-start">자막 시작</button>
             <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>세션 종료</button>
-            <button onclick="callAI()" class="btn btn-download" style="background:var(--ai-glow); color:white; border:none;">✨ 자동 요약하기</button>
-            <button onclick="createSmartMinutes()" class="btn btn-download">📝 회의록 만들기</button>
+            <button onclick="callAI()" class="btn btn-download" style="background:var(--ai-glow); color:white; border:none;">✨ 핵심 정리</button>
+            <button onclick="createSmartMinutes()" class="btn btn-download">📝 강의자료 만들기</button>
             <button onclick="downloadTranscript()" class="btn btn-download">📥 TXT 다운로드</button>
             <button onclick="downloadSessionRecording()" id="recording-download" class="btn btn-download" disabled>녹음 다운로드</button>
             <button onclick="transcribeSessionRecording()" id="recording-transcribe" class="btn btn-download" disabled>최종 변환</button>
-            <button onclick="switchMode('shared')" class="btn btn-download">공유 보기</button>
+            <button onclick="switchMode('shared')" class="btn btn-download">학생 링크 공유</button>
         </div>
         <div class="ad-slot ad-controls" aria-label="다운로드 버튼 근처 광고 영역">
             <ins class="adsbygoogle"
@@ -351,6 +419,122 @@
         </div>
         <p class="footer-info">© 2026 LiveNote. All rights reserved. <br> 로컬 자막은 브라우저에서 처리·저장되며, 클라우드/AI/공유 기능 사용 시 관련 데이터가 API로 전송될 수 있습니다. <br> Contact: <a class="email-link" href="mailto:smarttool_lee@naver.com">smarttool_lee@naver.com</a></p>
     </footer>
+
+    <div id="auth-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+        <div class="auth-dialog">
+            <div class="auth-header">
+                <div>
+                    <h3 id="auth-modal-title">Premium 로그인</h3>
+                    <p id="auth-modal-note">Premium 기능을 계정에 연결하려면 먼저 로그인하세요.</p>
+                </div>
+                <button type="button" onclick="closeAuthModal()" class="btn btn-pip">닫기</button>
+            </div>
+            <div class="auth-actions">
+                <button type="button" onclick="signInWithGoogle()" class="btn btn-start">Google로 계속</button>
+                <div class="auth-email-row">
+                    <input type="email" id="auth-email" class="custom-input" placeholder="email@example.com" autocomplete="email">
+                    <button type="button" onclick="sendMagicLink()" class="btn btn-download">이메일 링크</button>
+                </div>
+                <p id="auth-status" class="settings-note">Premium 기능을 사용하려면 로그인하세요.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="account-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+        <div class="auth-dialog">
+            <div class="auth-header">
+                <div>
+                    <h3 id="account-modal-title">마이페이지</h3>
+                    <p>계정, 플랜, 사용량을 확인합니다.</p>
+                </div>
+                <button type="button" onclick="closeAccountModal()" class="btn btn-pip">닫기</button>
+            </div>
+            <div class="account-panel">
+                <div class="account-row"><span>이메일</span><strong id="account-email">-</strong></div>
+                <div class="account-row"><span>현재 플랜</span><strong id="account-plan">Free</strong></div>
+                <div class="account-row"><span>클라우드 사용량</span><strong id="account-cloud-usage">0분/10분</strong></div>
+                <div class="account-row"><span>AI 사용량</span><strong id="account-ai-usage">0/3</strong></div>
+                <div class="account-actions">
+                    <button type="button" onclick="activatePremiumDemo()" class="btn btn-start">Premium 업그레이드</button>
+                    <button type="button" onclick="signOut()" class="btn btn-download">로그아웃</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pricing-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-modal-title">
+        <div class="auth-dialog pricing-dialog">
+            <div class="auth-header">
+                <div>
+                    <h3 id="pricing-modal-title">강의용 Premium으로 전환</h3>
+                    <p>기본 접근성 자막은 무료로 유지하고, 강의자료 생성·자막 파일·장시간 변환만 Premium으로 실험합니다.</p>
+                </div>
+                <button type="button" onclick="closePricingModal()" class="btn btn-pip">닫기</button>
+            </div>
+            <div class="pricing-grid">
+                <article class="price-card">
+                    <span class="price-label">Free</span>
+                    <strong>0원</strong>
+                    <p>기본 접근성 자막</p>
+                    <ul>
+                        <li>로컬 실시간 자막</li>
+                        <li>TXT 다운로드</li>
+                        <li>자료 정리 3회</li>
+                        <li>클라우드 10분</li>
+                    </ul>
+                </article>
+                <article class="price-card featured">
+                    <span class="price-label">Premium</span>
+                    <strong>월 9,900원</strong>
+                    <p>강의 자막과 수업자료 자동화</p>
+                    <ul>
+                        <li>API 키 없이 클라우드 고정밀 600분</li>
+                        <li>API 키 없이 강의자료/질문 300회</li>
+                        <li>SRT/VTT/PDF 내보내기</li>
+                        <li>긴 녹음 최종 변환 60회</li>
+                    </ul>
+                    <button type="button" onclick="startCheckout('premium')" class="btn btn-start">월 9,900원 시작</button>
+                    <button type="button" onclick="loadSampleLesson(); closePricingModal();" class="btn btn-pip">샘플 보기</button>
+                </article>
+                <article class="price-card">
+                    <span class="price-label">Pro / Education</span>
+                    <strong>월 19,900원~</strong>
+                    <p>강사·교육기관용 운영 기능</p>
+                    <ul>
+                        <li>긴 강의/세션 한도 확대</li>
+                        <li>공유 방 고급 기능</li>
+                        <li>기록 검색/폴더</li>
+                        <li>교육기관 문의 대응</li>
+                    </ul>
+                    <a class="btn btn-download" href="mailto:smarttool_lee@naver.com?subject=LiveNote%20Pro%20문의">문의하기</a>
+                </article>
+            </div>
+        </div>
+    </div>
+
+    <div id="upgrade-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+        <div class="auth-dialog">
+            <div class="auth-header">
+                <div>
+                    <h3 id="upgrade-modal-title">무료 한도에 도달했습니다</h3>
+                    <p id="upgrade-modal-reason">Premium으로 계속 사용할 수 있습니다.</p>
+                </div>
+                <button type="button" onclick="closeUpgradeModal()" class="btn btn-pip">닫기</button>
+            </div>
+            <div class="upgrade-body">
+                <div id="upgrade-usage" class="upgrade-usage">클라우드 0분/10분 · AI 0/3 · 최종변환 0/1</div>
+                <div class="upgrade-points">
+                    <span>고정밀 클라우드 600분</span>
+                    <span>강의자료 300회</span>
+                    <span>SRT/VTT/PDF 저장</span>
+                </div>
+                <div class="upgrade-actions">
+                    <button type="button" onclick="continueUpgradeFlow()" class="btn btn-start">Premium 보기</button>
+                    <button type="button" onclick="closeUpgradeModal()" class="btn btn-download">나중에</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <canvas id="pip-canvas" width="800" height="200"></canvas>
     <video id="pip-video" autoplay playsinline muted></video>

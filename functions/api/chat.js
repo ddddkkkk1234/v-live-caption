@@ -1,3 +1,5 @@
+import { assertQuota, getServerAccount, incrementServerUsage } from "./_usage.js";
+
 const PROVIDERS = {
   gemini: {
     defaultModel: "gemini-1.5-flash",
@@ -25,7 +27,7 @@ const jsonHeaders = (request, env) => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Vary": "Origin",
     "Content-Type": "application/json; charset=utf-8",
   };
@@ -75,7 +77,13 @@ const buildPrompt = (transcript, question, mode, options = {}) => {
     return `자막 내용:\n${transcript}\n\n질문:\n${question}\n\n위 자막 내용에 근거해서 한국어로 간결하고 정확하게 답변해 주세요.`;
   }
   if (mode === "translate") {
-    const target = options.targetLanguage === "en" ? "영어" : "한국어";
+    const targetMap = {
+      en: "영어",
+      "en-AU": "호주식 영어",
+      ko: "한국어",
+      ja: "일본어",
+    };
+    const target = targetMap[options.targetLanguage] || "영어";
     return `다음 실시간 자막 조각을 ${target}로 자연스럽게 번역해 주세요.
 
 규칙:
@@ -203,7 +211,7 @@ export async function onRequestPost(context) {
     const minutesType = cleanString(body.minutesType);
     const targetLanguage = cleanString(body.targetLanguage);
 
-    if (transcript.length < 5) {
+    if (transcript.length < (mode === "translate" ? 2 : 5)) {
       return jsonResponse({ result: "요약할 자막 내용이 부족합니다." }, 400, headers);
     }
     if (transcript.length > 20000) {
@@ -213,12 +221,32 @@ export async function onRequestPost(context) {
       return jsonResponse({ result: "질문이 너무 깁니다." }, 413, headers);
     }
 
-    const providerInfo = getProviderConfig(cleanString(body.provider) || "default");
+    const requestedProvider = cleanString(body.provider) || "default";
+    const providerInfo = getProviderConfig(requestedProvider);
     if (!providerInfo) {
       return jsonResponse({ result: "지원하지 않는 AI 제공업체입니다." }, 400, headers);
     }
 
     const { provider, config } = providerInfo;
+    const usesServerCredit = requestedProvider === "default";
+    const account = usesServerCredit ? await getServerAccount({ request, env }) : null;
+    if (usesServerCredit && !account?.user?.id) {
+      return jsonResponse({
+        result: "강의자료 정리는 로그인 후 사용할 수 있습니다. 기본 실시간 자막은 로그인 없이 사용할 수 있습니다.",
+        code: "login_required",
+      }, 401, headers);
+    }
+    const quota = usesServerCredit
+      ? await assertQuota({ env, account, metric: "aiRequests", amount: 1 })
+      : { ok: true };
+    if (!quota.ok) {
+      return jsonResponse({
+        result: "무료 강의자료 정리 횟수를 모두 사용했습니다. Premium으로 강의자료, 질문, 번역 한도를 늘릴 수 있습니다.",
+        code: "quota_exceeded",
+        usage: quota.usage,
+        limits: quota.limits,
+      }, 402, headers);
+    }
     const apiKey = resolveApiKey(provider, body, env);
     if (!apiKey) {
       return jsonResponse({ result: "AI API 키가 설정되지 않았습니다." }, 503, headers);
@@ -245,6 +273,10 @@ export async function onRequestPost(context) {
         model,
         prompt,
       });
+    }
+
+    if (usesServerCredit) {
+      await incrementServerUsage({ env, account, metric: "aiRequests", amount: 1 });
     }
 
     return jsonResponse({ result, provider, model }, 200, headers);

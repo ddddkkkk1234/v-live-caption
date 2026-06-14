@@ -1,3 +1,5 @@
+import { assertQuota, getServerAccount, incrementServerUsage } from "./_usage.js";
+
 const MAX_AUDIO_SIZE = 15 * 1024 * 1024;
 const POLL_INTERVAL_MS = 1000;
 const POLL_DEADLINE_MS = 22000;
@@ -49,7 +51,7 @@ const jsonHeaders = (request, env) => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Vary": "Origin",
     "Content-Type": "application/json; charset=utf-8",
   };
@@ -63,10 +65,16 @@ const cleanString = (value) => String(value || "").trim();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalizeLanguage = (language, provider) => {
-  if (!["ko", "en"].includes(language)) return "";
-  if (provider === "azure") return language === "ko" ? "ko-KR" : "en-US";
-  if (provider === "speechmatics") return language === "ko" ? "ko" : "en";
-  return language;
+  const normalized = language === "en-AU" ? "en" : language;
+  if (!["ko", "en", "ja"].includes(normalized)) return "";
+  if (provider === "azure") {
+    if (language === "en-AU") return "en-AU";
+    if (normalized === "ko") return "ko-KR";
+    if (normalized === "ja") return "ja-JP";
+    return "en-US";
+  }
+  if (provider === "speechmatics") return normalized;
+  return normalized;
 };
 
 const getProviderConfig = (providerName) => {
@@ -316,6 +324,30 @@ export async function onRequestPost(context) {
     }
 
     const { provider, config } = providerInfo;
+    const usesServerCredit = requestedProvider === "default";
+    const estimatedSeconds = Math.max(1, Math.ceil(Number(formData.get("durationSeconds")) || 4));
+    const usageMetric = cleanString(formData.get("usageMetric")) === "finalTranscribes"
+      ? "finalTranscribes"
+      : "cloudSeconds";
+    const usageAmount = usageMetric === "finalTranscribes" ? 1 : estimatedSeconds;
+    const account = usesServerCredit ? await getServerAccount({ request, env }) : null;
+    if (usesServerCredit && !account?.user?.id) {
+      return jsonResponse({
+        error: "클라우드 고정밀 자막은 로그인 후 사용할 수 있습니다. 무료 접근성 자막은 로컬 모드에서 계속 사용할 수 있습니다.",
+        code: "login_required",
+      }, 401, headers);
+    }
+    const quota = usesServerCredit
+      ? await assertQuota({ env, account, metric: usageMetric, amount: usageAmount })
+      : { ok: true };
+    if (!quota.ok) {
+      return jsonResponse({
+        error: "무료 클라우드 자막 시간이 모두 사용되었습니다. Premium으로 고정밀 자막 시간을 늘릴 수 있습니다.",
+        code: "quota_exceeded",
+        usage: quota.usage,
+        limits: quota.limits,
+      }, 402, headers);
+    }
     const apiKey = resolveApiKey(provider, formData, env);
     if (!apiKey) {
       return jsonResponse({ error: "음성 인식 API 키가 설정되지 않았습니다." }, 503, headers);
@@ -339,6 +371,10 @@ export async function onRequestPost(context) {
       text = await transcribeIbm({ audioFile, apiKey, model, providerExtra });
     } else if (config.type === "azure") {
       text = await transcribeAzure({ audioFile, apiKey, language, providerExtra });
+    }
+
+    if (usesServerCredit) {
+      await incrementServerUsage({ env, account, metric: usageMetric, amount: usageAmount });
     }
 
     return jsonResponse({ text, provider, model }, 200, headers);

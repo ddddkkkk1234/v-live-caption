@@ -5,10 +5,14 @@ let stream = null;
 let sessionRecorder = null;
 let sessionRecordingChunks = [];
 let lastSessionRecording = null;
+let sessionRecordingStartedAt = 0;
+let lastSessionRecordingDurationMs = 0;
 let lastLoggedText = ""; 
 let lastLowSignalLogAt = 0;
 let lastHistorySaveAt = 0;
 let transcriptText = "";
+let captionSegments = [];
+let sessionCaptionStartedAt = 0;
 let whisperModelId = "";
 let whisperWorker = null;
 let whisperRequestId = 0;
@@ -24,6 +28,7 @@ let cloudBackoffUntil = 0;
 let toastTimer = null;
 const translationCache = new Map();
 const HISTORY_KEY = 'vlive_history';
+const CAPTION_SEGMENTS_KEY = 'vlive_caption_segments';
 const TRANSLATION_MIN_INTERVAL_MS = 2500;
 const MIC_PERMISSION_VALUE = "__request_mic_permission";
 const DISPLAY_TRANSCRIPT_LIMIT = 3000;
@@ -32,6 +37,354 @@ const LOCAL_WHISPER_MODEL = "Xenova/whisper-tiny";
 const FALLBACK_WHISPER_MODEL = "Xenova/whisper-base";
 const LOCAL_MIN_RMS = 0.008;
 const CAPTURE_TIMING = { localRecordMs: 1700, cloudRecordMs: 3200, restartDelayMs: 200 };
+const PLAN_KEY = 'vlive_plan';
+const USAGE_KEY = 'vlive_usage_daily';
+const LESSON_META_KEY = 'vlive_lesson_meta';
+const FREE_LIMITS = {
+    cloudSeconds: 10 * 60,
+    aiRequests: 3,
+    finalTranscribes: 1,
+    historyItems: 10
+};
+const PREMIUM_LIMITS = {
+    cloudSeconds: 600 * 60,
+    aiRequests: 300,
+    finalTranscribes: 60,
+    historyItems: 100
+};
+const UI_LANGUAGE_KEY = 'vlive_ui_language';
+const UI_TEXT = {
+    en: {
+        navLive: "Live captions",
+        navHistory: "History",
+        navGuide: "Guide",
+        statusReady: "Ready",
+        micLevel: "Mic level",
+        myPage: "My page",
+        login: "Log in",
+        heroTitle: "Live lecture captions",
+        heroBody: "Share captions on screen and by link during class, then create lecture notes, SRT/VTT, and PDF after the session.",
+        micLabel: "Available microphone",
+        micSelect: "Select an available microphone",
+        micPermission: "Allow microphone permission",
+        modeLabel: "Caption mode",
+        localMode: "Process on this device",
+        cloudMode: "High-accuracy cloud",
+        settings: "Settings",
+        translationLabel: "Translation language",
+        noTranslation: "No translation",
+        lessonTitle: "Class title",
+        lessonPlaceholder: "e.g. Grade 9 Science Unit 2",
+        lessonNote: "The class title is saved with history. Speaker separation or institution-owned API keys are available in advanced settings.",
+        premiumExperiment: "Lecture Premium preview",
+        premiumPreview: "View Lecture Premium",
+        freePreview: "View Free",
+        flowLiveTitle: "Live captions",
+        flowLiveBody: "Show microphone audio as large captions in real time.",
+        flowShareTitle: "Student link sharing",
+        flowShareBody: "Send captions to student screens with a QR link.",
+        flowNotesTitle: "Class materials",
+        flowNotesBody: "Turn captions into lecture notes, SRT/VTT, and PDF.",
+        sampleTitle: "Sample output",
+        sampleBody: "After class, organize the transcript into review-ready material.",
+        sampleApply: "Load sample",
+        lectureNote: "Lecture note",
+        sampleLessonTitle: "Grade 9 Science: Current and Voltage",
+        sampleLessonBody: "Organize key concepts, confusing terms, review questions, and next-class tasks into one document.",
+        subtitleFile: "Caption file",
+        subtitleFileBody: "Create timestamped caption files ready for recorded lecture uploads.",
+        cloudHigh: "High-accuracy cloud",
+        serverCredit: "Using LiveNote server credits · No API key setup needed",
+        advancedSettings: "Advanced settings",
+        closeSettings: "Close settings",
+        advancedApi: "Advanced API settings",
+        useMyApi: "Use my API key",
+        provider: "Provider",
+        model: "Model",
+        apiKey: "API key",
+        keyStorage: "Key storage",
+        saveBrowser: "Save in this browser",
+        saveSession: "Save for this session only",
+        extraSettings: "Extra settings",
+        extraPlaceholder: "Service URL or region",
+        diarization: "Use speaker separation",
+        providerHelp: "Free/Premium can use LiveNote server credits immediately. Only developers or institutions need their own API key.",
+        apiCostNote: "If you use your own API key, provider costs may apply instead of LiveNote usage limits. Keys are saved only in this browser.",
+        groqKeyTest: "Enter Groq key for testing",
+        makeGroqKey: "Create Groq API key",
+        makeOpenAiKey: "Create OpenAI API key",
+        joinGladia: "Join Gladia",
+        joinSpeechmatics: "Join Speechmatics",
+        fontSize: "Font size",
+        textColor: "Text color",
+        captionBackground: "Caption background",
+        opacity: "Opacity",
+        settingsNote: "Changes apply immediately to live captions, shared view, and PIP mode, and are saved in this browser.",
+        livePanel: "Live captions",
+        reset: "Reset",
+        largeCaption: "Large caption",
+        defaultView: "Default view",
+        pipMode: "PIP mode",
+        classMaterials: "Class materials",
+        materialSettings: "Material settings",
+        advancedAiApi: "Advanced class-material API settings",
+        aiEmpty: "After class, create key summaries, review points, and assignment hints.",
+        questionPlaceholder: "Ask a question about the captions",
+        send: "Send",
+        meetingMinutes: "Meeting minutes",
+        lectureNotes: "Lecture notes",
+        consultingRecord: "Consulting record",
+        createMaterials: "Create materials",
+        copyMarkdown: "Copy Markdown",
+        downloadMd: "Download MD",
+        startCaptions: "Start captions",
+        endSession: "End session",
+        summarize: "Summarize",
+        downloadTxt: "Download TXT",
+        downloadRecording: "Download recording",
+        finalTranscribe: "Final transcribe",
+        shareStudentLink: "Share student link",
+        debugReady: "System ready.",
+        sharedBeta: "Shared view beta",
+        backToLive: "Back to live captions",
+        roomId: "Room ID",
+        roomPlaceholder: "Enter or generate a room ID",
+        generateId: "Generate ID",
+        currentStatus: "Current status",
+        waiting: "Waiting to connect...",
+        role: "Role",
+        senderRole: "Send captions (phone)",
+        receiverRole: "Receive captions (PC/tablet)",
+        sharePlaceholder: "Create a room ID to generate a share link.",
+        copyLink: "Copy link",
+        stageLink: "Stage link",
+        makeQr: "Create QR",
+        audienceNote: "Audience members can join receiver mode by link or QR. Stage mode is for projectors and large screens.",
+        sharedView: "Shared view",
+        stageMode: "Stage mode",
+        stageEnd: "Exit stage",
+        clearScreen: "Clear screen",
+        connect: "Connect",
+        disconnect: "Disconnect",
+        savedHistory: "Saved caption history",
+        deleteAll: "Delete all",
+        privacy: "Privacy Policy",
+        terms: "Terms",
+        contact: "Contact",
+        authTitle: "Premium login",
+        authNote: "Log in first to connect Premium features to your account.",
+        close: "Close",
+        googleContinue: "Continue with Google",
+        emailLink: "Email link",
+        authStatus: "Log in to use Premium features.",
+        accountTitle: "My page",
+        accountNote: "Check your account, plan, and usage.",
+        email: "Email",
+        currentPlan: "Current plan",
+        cloudUsage: "Cloud usage",
+        aiUsage: "AI usage",
+        premiumUpgrade: "Upgrade to Premium",
+        logout: "Log out",
+        pricingTitle: "Switch to Lecture Premium",
+        pricingBody: "Keep basic accessibility captions free, and test Premium only for class-material generation, caption files, and long-session conversion.",
+        freePrice: "$0",
+        freeCaption: "Basic accessibility captions",
+        freeFeature1: "Local live captions",
+        freeFeature2: "TXT download",
+        freeFeature3: "3 material generations",
+        freeFeature4: "10 cloud minutes",
+        premiumPrice: "$9.99/month",
+        premiumCaption: "Automated lecture captions and class materials",
+        premiumFeature1: "600 high-accuracy cloud minutes without API keys",
+        premiumFeature2: "300 class-material/question requests without API keys",
+        premiumFeature3: "SRT/VTT/PDF export",
+        premiumFeature4: "60 long-recording final conversions",
+        startPremium: "Start $9.99/month",
+        viewSample: "View sample",
+        proPrice: "$19.99+/month",
+        proCaption: "Operations for instructors and schools",
+        proFeature1: "Higher limits for long classes/sessions",
+        proFeature2: "Advanced shared-room features",
+        proFeature3: "History search/folders",
+        proFeature4: "Education support",
+        contactUs: "Contact us",
+        limitReached: "Free limit reached",
+        upgradeReason: "Continue with Premium.",
+        upgradeCloud: "600 high-accuracy cloud minutes",
+        upgradeAi: "300 class-material requests",
+        upgradeExport: "SRT/VTT/PDF saving",
+        viewPremium: "View Premium",
+        later: "Later"
+    },
+    ko: {
+        navLive: "실시간 자막",
+        navHistory: "지난 자막",
+        navGuide: "사용 가이드",
+        statusReady: "시스템 준비됨",
+        micLevel: "마이크 감도",
+        myPage: "마이페이지",
+        login: "로그인",
+        heroTitle: "강의 실시간 자막 송출",
+        heroBody: "강의 중 자막을 화면과 링크로 공유하고, 종료 후 강의노트와 SRT/VTT/PDF를 만듭니다.",
+        micLabel: "이용 가능한 마이크",
+        micSelect: "이용 가능한 마이크 선택",
+        micPermission: "마이크 권한 허용하기",
+        modeLabel: "자막 모드 선택 (Mode)",
+        localMode: "내 기기에서 처리",
+        cloudMode: "클라우드 고정밀",
+        settings: "Settings",
+        translationLabel: "번역 언어",
+        noTranslation: "번역 안 함",
+        lessonTitle: "수업명",
+        lessonPlaceholder: "예: 중3 과학 2단원",
+        lessonNote: "수업명은 지난 자막에 함께 저장됩니다. 화자 구분이나 기관 자체 키는 고급 설정에서 선택할 수 있습니다.",
+        premiumExperiment: "강의자료 Premium 실험",
+        premiumPreview: "강의 Premium 보기",
+        freePreview: "Free로 보기",
+        flowLiveTitle: "실시간 자막",
+        flowLiveBody: "마이크 소리를 바로 큰 자막으로 보여줍니다.",
+        flowShareTitle: "학생 링크 공유",
+        flowShareBody: "QR 링크로 학생 화면에 자막을 보냅니다.",
+        flowNotesTitle: "강의자료 생성",
+        flowNotesBody: "강의노트와 SRT/VTT/PDF로 정리합니다.",
+        sampleTitle: "샘플 결과물",
+        sampleBody: "강의가 끝나면 자막 원문을 복습자료 형태로 정리합니다.",
+        sampleApply: "샘플 적용",
+        lectureNote: "강의노트",
+        sampleLessonTitle: "중3 과학: 전류와 전압",
+        sampleLessonBody: "핵심 개념 3개, 헷갈리는 용어, 복습 질문, 다음 수업 과제를 한 문서로 정리합니다.",
+        subtitleFile: "자막 파일",
+        subtitleFileBody: "녹화 강의 업로드에 바로 쓰는 시간표시 자막 파일을 만듭니다.",
+        cloudHigh: "클라우드 고정밀",
+        serverCredit: "LiveNote 서버 크레딧 사용 중 · API 키 설정 없이 사용",
+        advancedSettings: "고급 설정",
+        closeSettings: "설정 닫기",
+        advancedApi: "고급 API 설정",
+        useMyApi: "내 API 키 사용",
+        provider: "제공업체",
+        model: "모델",
+        apiKey: "API 키",
+        keyStorage: "키 저장 위치",
+        saveBrowser: "이 브라우저에 저장",
+        saveSession: "이번 세션만 저장",
+        extraSettings: "추가 설정",
+        extraPlaceholder: "서비스 URL 또는 리전",
+        diarization: "화자 분리 사용",
+        providerHelp: "Free/Premium은 LiveNote 서버 크레딧으로 바로 사용할 수 있습니다. 개발자나 기관만 자체 API 키를 선택하세요.",
+        apiCostNote: "내 API 키를 쓰면 LiveNote 사용량 한도 대신 해당 API 제공업체 비용이 직접 발생합니다. 키는 이 브라우저에만 저장됩니다.",
+        groqKeyTest: "Groq 키 테스트 입력",
+        makeGroqKey: "Groq API 키 만들기",
+        makeOpenAiKey: "OpenAI API 키 만들기",
+        joinGladia: "Gladia 가입",
+        joinSpeechmatics: "Speechmatics 가입",
+        fontSize: "글자 크기 (Size)",
+        textColor: "글자 색상 (Color)",
+        captionBackground: "자막 배경색 (Background)",
+        opacity: "배경 투명도 (Opacity)",
+        settingsNote: "변경한 설정은 실시간 자막, 공유 보기, PIP 모드에 즉시 반영되고 이 브라우저에 저장됩니다.",
+        livePanel: "실시간 자막",
+        reset: "초기화",
+        largeCaption: "큰 자막",
+        defaultView: "기본 화면",
+        pipMode: "PIP 모드",
+        classMaterials: "강의자료",
+        materialSettings: "자료 설정",
+        advancedAiApi: "강의자료 고급 API 설정",
+        aiEmpty: "강의가 끝나면 핵심 요약, 복습 포인트, 과제 힌트를 자료로 정리합니다.",
+        questionPlaceholder: "자막 내용에 대해 질문하세요",
+        send: "전송",
+        meetingMinutes: "회의록",
+        lectureNotes: "강의 노트",
+        consultingRecord: "상담 기록",
+        createMaterials: "자료 만들기",
+        copyMarkdown: "Markdown 복사",
+        downloadMd: "MD 다운로드",
+        startCaptions: "자막 시작",
+        endSession: "세션 종료",
+        summarize: "핵심 정리",
+        downloadTxt: "TXT 다운로드",
+        downloadRecording: "녹음 다운로드",
+        finalTranscribe: "최종 변환",
+        shareStudentLink: "학생 링크 공유",
+        debugReady: "시스템 준비 완료.",
+        sharedBeta: "공유 보기 베타",
+        backToLive: "실시간 자막으로 돌아가기",
+        roomId: "방 번호 (Room ID)",
+        roomPlaceholder: "방 번호를 입력하거나 생성하세요",
+        generateId: "ID 생성",
+        currentStatus: "현재 상태",
+        waiting: "연결 대기 중...",
+        role: "역할 선택",
+        senderRole: "보내기 (휴대폰용)",
+        receiverRole: "받아보기 (PC/태블릿용)",
+        sharePlaceholder: "방 번호를 만들면 공유 링크가 생성됩니다.",
+        copyLink: "링크 복사",
+        stageLink: "송출 링크",
+        makeQr: "QR 만들기",
+        audienceNote: "청중은 링크나 QR로 바로 받아보기 모드에 들어올 수 있습니다. 송출 모드는 프로젝터/큰 화면용입니다.",
+        sharedView: "공유 보기",
+        stageMode: "송출 모드",
+        stageEnd: "송출 종료",
+        clearScreen: "화면 비우기",
+        connect: "연결하기",
+        disconnect: "연결 해제",
+        savedHistory: "저장된 자막 기록",
+        deleteAll: "전체 삭제",
+        privacy: "개인정보처리방침",
+        terms: "이용약관",
+        contact: "문의하기",
+        authTitle: "Premium 로그인",
+        authNote: "Premium 기능을 계정에 연결하려면 먼저 로그인하세요.",
+        close: "닫기",
+        googleContinue: "Google로 계속",
+        emailLink: "이메일 링크",
+        authStatus: "Premium 기능을 사용하려면 로그인하세요.",
+        accountTitle: "마이페이지",
+        accountNote: "계정, 플랜, 사용량을 확인합니다.",
+        email: "이메일",
+        currentPlan: "현재 플랜",
+        cloudUsage: "클라우드 사용량",
+        aiUsage: "AI 사용량",
+        premiumUpgrade: "Premium 업그레이드",
+        logout: "로그아웃",
+        pricingTitle: "강의용 Premium으로 전환",
+        pricingBody: "기본 접근성 자막은 무료로 유지하고, 강의자료 생성·자막 파일·장시간 변환만 Premium으로 실험합니다.",
+        freePrice: "0원",
+        freeCaption: "기본 접근성 자막",
+        freeFeature1: "로컬 실시간 자막",
+        freeFeature2: "TXT 다운로드",
+        freeFeature3: "자료 정리 3회",
+        freeFeature4: "클라우드 10분",
+        premiumPrice: "월 9,900원",
+        premiumCaption: "강의 자막과 수업자료 자동화",
+        premiumFeature1: "API 키 없이 클라우드 고정밀 600분",
+        premiumFeature2: "API 키 없이 강의자료/질문 300회",
+        premiumFeature3: "SRT/VTT/PDF 내보내기",
+        premiumFeature4: "긴 녹음 최종 변환 60회",
+        startPremium: "월 9,900원 시작",
+        viewSample: "샘플 보기",
+        proPrice: "월 19,900원~",
+        proCaption: "강사·교육기관용 운영 기능",
+        proFeature1: "긴 강의/세션 한도 확대",
+        proFeature2: "공유 방 고급 기능",
+        proFeature3: "기록 검색/폴더",
+        proFeature4: "교육기관 문의 대응",
+        contactUs: "문의하기",
+        limitReached: "무료 한도에 도달했습니다",
+        upgradeReason: "Premium으로 계속 사용할 수 있습니다.",
+        upgradeCloud: "고정밀 클라우드 600분",
+        upgradeAi: "강의자료 300회",
+        upgradeExport: "SRT/VTT/PDF 저장",
+        viewPremium: "Premium 보기",
+        later: "나중에"
+    }
+};
+const UI_TEXT_KEYS = Object.keys(UI_TEXT.en);
+const UI_TEXT_LOOKUP = UI_TEXT_KEYS.reduce((map, key) => {
+    map[UI_TEXT.en[key]] = key;
+    map[UI_TEXT.ko[key]] = key;
+    return map;
+}, {});
 const STT_PROVIDER_MODELS = {
     groq: [
         { value: "whisper-large-v3", label: "whisper-large-v3" },
@@ -109,6 +462,10 @@ const AI_PROVIDER_MODELS = {
 // 실제 운영시에는 본인의 프로젝트 URL과 API KEY로 변경해야 합니다.
 let supabaseClient = null;
 let roomSubscription = null;
+let currentUser = null;
+let currentSession = null;
+let authConfigError = "";
+let publicConfig = null;
 
 const pipCanvas = document.getElementById('pip-canvas');
 const pipVideo = document.getElementById('pip-video');
@@ -117,6 +474,7 @@ const pipCtx = pipCanvas.getContext('2d');
 window.onload = () => {
     const saved = localStorage.getItem('vlive_transcript');
     transcriptText = saved || "";
+    captionSegments = getStoredCaptionSegments();
     renderTranscriptDisplay();
     
     // 저장된 설정 불러오기
@@ -133,9 +491,14 @@ window.onload = () => {
     updateStyle();
     restoreApiSettings();
     restoreAiSettings();
+    restoreLessonMeta();
+    initLanguageControls();
     updateEngineSettingsVisibility();
     renderHistory();
     initAds();
+    renderPremiumState();
+    initAuthState();
+    handleBillingReturn();
     applyShareParams();
     if (!isSharedReceiverUrl()) setupMicrophoneSelect();
 };
@@ -254,7 +617,7 @@ async function toggleStageMode(shouldRequestFullscreen = true) {
     document.body.classList.toggle('stage-mode');
     const active = document.body.classList.contains('stage-mode');
     const btn = document.getElementById('stage-mode-btn');
-    if (btn) btn.textContent = active ? "송출 종료" : "송출 모드";
+    if (btn) btn.textContent = active ? uiText('stageEnd') : uiText('stageMode');
     if (active && shouldRequestFullscreen) {
         try {
             await document.getElementById('shared-container')?.requestFullscreen?.();
@@ -270,9 +633,40 @@ document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && document.body.classList.contains('stage-mode')) {
         document.body.classList.remove('stage-mode');
         const btn = document.getElementById('stage-mode-btn');
-        if (btn) btn.textContent = "송출 모드";
+        if (btn) btn.textContent = uiText('stageMode');
     }
 });
+
+async function ensureSupabaseClient() {
+    if (supabaseClient) return supabaseClient;
+    if (!window.supabase) {
+        authConfigError = "Supabase client library is not loaded.";
+        throw new Error(authConfigError);
+    }
+    const configRes = await fetch('/api/config');
+    if (!configRes.ok) {
+        authConfigError = "/api/config is not available in this environment.";
+        throw new Error(authConfigError);
+    }
+    const config = await configRes.json();
+    publicConfig = config;
+    const supabaseKey = config.supabaseAnonKey || config.supabaseKey;
+    if (!config.supabaseUrl || !supabaseKey) {
+        authConfigError = "SUPABASE_URL and SUPABASE_ANON_KEY are required.";
+        throw new Error(authConfigError);
+    }
+    authConfigError = "";
+    supabaseClient = supabase.createClient(config.supabaseUrl, supabaseKey);
+    return supabaseClient;
+}
+
+async function getPublicConfig() {
+    if (publicConfig) return publicConfig;
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error("서비스 설정을 불러오지 못했습니다.");
+    publicConfig = await res.json();
+    return publicConfig;
+}
 
 async function toggleSharedConnection() {
     const btn = document.getElementById('shared-connect-btn');
@@ -280,9 +674,9 @@ async function toggleSharedConnection() {
     const room = document.getElementById('room-id').value;
     const role = document.getElementById('role-select').value;
     
-    if (!room) return alert("방 번호를 입력해주세요.");
+    if (!room) return alert(getAppLanguage() === 'ko' ? "방 번호를 입력해주세요." : "Enter a room ID first.");
 
-    if (btn.innerText === "연결하기") {
+    if (!btn.classList.contains('btn-stop')) {
         // Supabase 초기화
         if (!supabaseClient) {
             try {
@@ -302,9 +696,11 @@ async function toggleSharedConnection() {
             }
         }
 
-        btn.innerText = "연결 해제";
+        btn.innerText = uiText('disconnect');
         btn.classList.replace('btn-start', 'btn-stop');
-        status.innerText = `${room}번 방에 ${role === 'sender' ? '전송' : '수신'} 모드로 연결됨`;
+        status.innerText = getAppLanguage() === 'ko'
+            ? `${room}번 방에 ${role === 'sender' ? '전송' : '수신'} 모드로 연결됨`
+            : `Connected to room ${room} in ${role === 'sender' ? 'sender' : 'receiver'} mode`;
         status.style.color = "var(--primary)";
 
         if (role === 'receiver') {
@@ -313,7 +709,7 @@ async function toggleSharedConnection() {
                 .channel(`room-${room}`)
                 .on('broadcast', { event: 'caption' }, (payload) => {
                     const sharedText = document.getElementById('shared-text');
-                    if (sharedText.innerText.includes("방 번호를 입력하고")) sharedText.innerText = "";
+                    if (sharedText.innerText.includes("방 번호를 입력하고") || sharedText.innerText.includes("Enter a room ID")) sharedText.innerText = "";
                     sharedText.innerText += payload.payload.text + " ";
                     // 자동 스크롤
                     const scrollArea = document.getElementById('shared-scroll');
@@ -333,9 +729,9 @@ async function toggleSharedConnection() {
             supabaseClient.removeChannel(roomSubscription);
             roomSubscription = null;
         }
-        btn.innerText = "연결하기";
+        btn.innerText = uiText('connect');
         btn.classList.replace('btn-stop', 'btn-start');
-        status.innerText = "연결 대기 중...";
+        status.innerText = uiText('waiting');
         status.style.color = "var(--text-muted)";
     }
 }
@@ -346,7 +742,7 @@ async function broadcastText(text) {
     const room = document.getElementById('room-id').value;
     const role = document.getElementById('role-select').value;
 
-    if (btn.innerText === "연결 해제" && role === 'sender' && room && supabaseClient) {
+    if (btn.classList.contains('btn-stop') && role === 'sender' && room && supabaseClient) {
         await supabaseClient.channel(`room-${room}`).send({
             type: 'broadcast',
             event: 'caption',
@@ -386,7 +782,7 @@ function hexToRgba(hex, opacity) {
 function toggleFocusMode() {
     document.body.classList.toggle('caption-focus');
     const btn = document.getElementById('focus-mode-btn');
-    if (btn) btn.textContent = document.body.classList.contains('caption-focus') ? "기본 화면" : "큰 자막";
+    if (btn) btn.textContent = document.body.classList.contains('caption-focus') ? uiText('defaultView') : uiText('largeCaption');
 }
 
 function toggleSettingsPanel() {
@@ -394,7 +790,95 @@ function toggleSettingsPanel() {
     const btn = document.getElementById('settings-toggle');
     if (!panel) return;
     panel.classList.toggle('active');
-    if (btn) btn.textContent = panel.classList.contains('active') ? "설정 닫기" : "환경설정";
+    if (btn) {
+        btn.textContent = "⚙️";
+        btn.classList.toggle('active', panel.classList.contains('active'));
+    }
+}
+
+function getAppLanguage() {
+    const selected = document.getElementById('lang-select')?.value || localStorage.getItem(UI_LANGUAGE_KEY) || 'en';
+    return selected === 'ko' ? 'ko' : 'en';
+}
+
+function initLanguageControls() {
+    const selector = document.getElementById('lang-select');
+    const urlLang = new URLSearchParams(window.location.search).get('lang');
+    const saved = ['en', 'ko', 'ja'].includes(urlLang) ? urlLang : (localStorage.getItem(UI_LANGUAGE_KEY) || 'en');
+    if (selector) {
+        selector.value = ['en', 'ko', 'ja'].includes(saved) ? saved : 'en';
+        selector.addEventListener('change', () => {
+            localStorage.setItem(UI_LANGUAGE_KEY, selector.value || 'en');
+            applyUiLanguage();
+            renderPremiumState();
+            renderAuthState();
+            renderHistory();
+        });
+    }
+    applyUiLanguage();
+}
+
+function preserveTextWhitespace(original, replacement) {
+    const leading = original.match(/^\s*/)?.[0] || "";
+    const trailing = original.match(/\s*$/)?.[0] || "";
+    return `${leading}${replacement}${trailing}`;
+}
+
+function translateInlineText(value, dict) {
+    const normalized = value.trim().replace(/\s+/g, ' ');
+    const directKey = UI_TEXT_LOOKUP[normalized];
+    if (directKey && dict[directKey]) return preserveTextWhitespace(value, dict[directKey]);
+    const stripped = normalized.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+    const prefix = normalized.slice(0, normalized.indexOf(stripped));
+    const strippedKey = UI_TEXT_LOOKUP[stripped];
+    if (strippedKey && dict[strippedKey]) return preserveTextWhitespace(value, `${prefix}${dict[strippedKey]}`);
+    return value;
+}
+
+function applyUiLanguage() {
+    const lang = getAppLanguage();
+    const dict = UI_TEXT[lang] || UI_TEXT.en;
+    document.documentElement.lang = lang;
+    document.querySelectorAll('body *').forEach((el) => {
+        if (['SCRIPT', 'STYLE', 'OPTION'].includes(el.tagName)) return;
+        el.childNodes.forEach((node) => {
+            if (node.nodeType !== Node.TEXT_NODE) return;
+            node.nodeValue = translateInlineText(node.nodeValue, dict);
+        });
+        if (el.placeholder) {
+            const key = UI_TEXT_LOOKUP[el.placeholder.trim()];
+            if (key && dict[key]) el.placeholder = dict[key];
+        }
+        if (el.title) {
+            const key = UI_TEXT_LOOKUP[el.title.trim()];
+            if (key && dict[key]) el.title = dict[key];
+        }
+        const aria = el.getAttribute('aria-label');
+        if (aria) {
+            const key = UI_TEXT_LOOKUP[aria.trim()];
+            if (key && dict[key]) el.setAttribute('aria-label', dict[key]);
+        }
+    });
+    document.querySelectorAll('option').forEach((option) => {
+        const normalized = option.textContent.trim().replace(/\s+/g, ' ');
+        const key = UI_TEXT_LOOKUP[normalized];
+        if (key && dict[key]) option.textContent = dict[key];
+    });
+    updateApiSummary();
+    updateAiSummary();
+}
+
+function uiText(key) {
+    return (UI_TEXT[getAppLanguage()] || UI_TEXT.en)[key] || UI_TEXT.en[key] || key;
+}
+
+function getRecognitionLanguage() {
+    const value = document.getElementById('lang-select')?.value || 'en';
+    return value === 'en-AU' ? 'en' : value;
+}
+
+function getRecognitionLanguageForServer() {
+    return document.getElementById('lang-select')?.value || 'en';
 }
 
 function restoreApiSettings() {
@@ -430,7 +914,7 @@ function updateEngineSettingsVisibility() {
     if (!apiSettings) return;
     apiSettings.classList.toggle('active', engine === 'groq');
     apiSettings.classList.remove('detail-open');
-    if (btn) btn.textContent = "API 설정";
+    if (btn) btn.textContent = uiText('advancedSettings');
 }
 
 function toggleApiDetail() {
@@ -438,7 +922,7 @@ function toggleApiDetail() {
     const btn = document.getElementById('api-detail-toggle');
     if (!apiSettings) return;
     apiSettings.classList.toggle('detail-open');
-    if (btn) btn.textContent = apiSettings.classList.contains('detail-open') ? "설정 닫기" : "API 설정";
+    if (btn) btn.textContent = apiSettings.classList.contains('detail-open') ? uiText('closeSettings') : uiText('advancedSettings');
 }
 
 function togglePersonalApiSettings(shouldSave = true) {
@@ -483,7 +967,27 @@ function updateProviderExtraVisibility() {
     if (apiSettings) apiSettings.classList.toggle('supports-diarization', supportsDiarization);
     if (extraLabel && meta.extra) extraLabel.textContent = meta.extra.label;
     if (extraInput && meta.extra) extraInput.placeholder = meta.extra.placeholder;
-    if (providerHelp) providerHelp.textContent = meta.help;
+    if (providerHelp) providerHelp.textContent = getProviderHelp(provider);
+}
+
+function getProviderHelp(provider) {
+    const english = {
+        groq: "Use one Groq key for Whisper-based high-accuracy captions.",
+        openai: "Use one OpenAI key for high-accuracy captions. It can also work well for AI class-material generation.",
+        gladia: "Gladia can be useful for longer usage. The server uploads short recorded chunks and receives the result.",
+        speechmatics: "Speechmatics is strong for accents and varied speech. Short audio chunks are submitted as jobs.",
+        ibm: "IBM Watson requires both an API key and a service URL.",
+        azure: "Azure Speech requires an API key and region. Some browser recording formats may fail depending on the environment."
+    };
+    const korean = {
+        groq: "Groq 키 하나로 Whisper 기반 고정밀 자막을 사용할 수 있습니다.",
+        openai: "OpenAI 키 하나로 고정밀 자막을 사용할 수 있습니다. AI 자막 정리와도 같은 키를 재사용하기 좋습니다.",
+        gladia: "Gladia는 무료 제공량이 넉넉한 편이라 긴 사용에 적합합니다. 서버가 짧게 녹음한 음성 조각을 업로드하고 결과를 받아옵니다.",
+        speechmatics: "Speechmatics는 악센트와 다양한 발화에 강한 편입니다. 짧은 음성 조각을 작업으로 등록한 뒤 결과를 받아옵니다.",
+        ibm: "IBM Watson은 API 키와 서비스 URL이 모두 필요합니다.",
+        azure: "Azure Speech는 API 키와 리전이 필요합니다. 현재 브라우저 녹음 포맷에 따라 일부 환경에서 실패할 수 있습니다."
+    };
+    return (getAppLanguage() === 'ko' ? korean : english)[provider] || (getAppLanguage() === 'ko' ? korean.groq : english.groq);
 }
 
 function saveApiSettings() {
@@ -520,7 +1024,7 @@ function applyGroqApiKey(apiKey, storage = "session") {
     if (keyInput) keyInput.value = key;
     togglePersonalApiSettings(false);
     saveApiSettings();
-    showToast("Groq 개인 API 키를 이번 세션에 적용했습니다.");
+    showToast("내 Groq API 키를 이번 세션에 적용했습니다.");
     return true;
 }
 
@@ -537,13 +1041,14 @@ function updateApiSummary() {
     if (!summary) return;
     const usePersonalKey = document.getElementById('personal-api-enabled')?.checked;
     if (!usePersonalKey) {
-        summary.textContent = "기본 서버 API 사용 중 · 개인 키 선택 가능";
+        summary.textContent = uiText('serverCredit');
         return;
     }
     const provider = document.getElementById('stt-provider')?.value || 'groq';
     const model = document.getElementById('stt-model')?.value || '';
-    const meta = STT_PROVIDER_META[provider] || STT_PROVIDER_META.groq;
-    summary.textContent = `${meta.summary}${model ? ` · ${model}` : ""}`;
+    summary.textContent = getAppLanguage() === 'ko'
+        ? `내 ${provider.toUpperCase()} API 키 사용 중${model ? ` · ${model}` : ""}`
+        : `Using my ${provider.toUpperCase()} API key${model ? ` · ${model}` : ""}`;
 }
 
 function getSttRequestSettings() {
@@ -585,6 +1090,374 @@ function setSecretValue(key, value, storageModeKey, mode) {
     }
 }
 
+function getLessonMeta() {
+    const titleInput = document.getElementById('lesson-title');
+    const title = (titleInput?.value || "").trim();
+    return { title };
+}
+
+function restoreLessonMeta() {
+    try {
+        const meta = JSON.parse(localStorage.getItem(LESSON_META_KEY) || "{}");
+        const titleInput = document.getElementById('lesson-title');
+        if (titleInput && meta.title) titleInput.value = meta.title;
+    } catch (e) {}
+}
+
+function saveLessonMeta() {
+    localStorage.setItem(LESSON_META_KEY, JSON.stringify(getLessonMeta()));
+}
+
+function getPlan() {
+    const plan = localStorage.getItem(PLAN_KEY);
+    return ['premium', 'team'].includes(plan) ? plan : 'free';
+}
+
+function isPremiumPlan() {
+    return getPlan() !== 'free';
+}
+
+function getPlanLimits() {
+    return isPremiumPlan() ? PREMIUM_LIMITS : FREE_LIMITS;
+}
+
+function getTodayKey() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function getUsage() {
+    const today = getTodayKey();
+    try {
+        const parsed = JSON.parse(localStorage.getItem(USAGE_KEY) || "{}");
+        if (parsed.date === today) {
+            return {
+                date: today,
+                cloudSeconds: Number(parsed.cloudSeconds) || 0,
+                aiRequests: Number(parsed.aiRequests) || 0,
+                finalTranscribes: Number(parsed.finalTranscribes) || 0
+            };
+        }
+    } catch (e) {}
+    return { date: today, cloudSeconds: 0, aiRequests: 0, finalTranscribes: 0 };
+}
+
+function setUsage(usage) {
+    localStorage.setItem(USAGE_KEY, JSON.stringify({
+        date: getTodayKey(),
+        cloudSeconds: Math.max(0, Number(usage.cloudSeconds) || 0),
+        aiRequests: Math.max(0, Number(usage.aiRequests) || 0),
+        finalTranscribes: Math.max(0, Number(usage.finalTranscribes) || 0)
+    }));
+    renderPremiumState();
+}
+
+function hasQuota(metric, amount = 1) {
+    const limits = getPlanLimits();
+    const usage = getUsage();
+    return (Number(usage[metric]) || 0) + amount <= (Number(limits[metric]) || 0);
+}
+
+function incrementUsage(metric, amount = 1) {
+    const usage = getUsage();
+    usage[metric] = (Number(usage[metric]) || 0) + amount;
+    setUsage(usage);
+}
+
+async function fetchServerUsage() {
+    if (!currentSession?.access_token) return;
+    try {
+        const res = await fetch('/api/usage', {
+            headers: { Authorization: `Bearer ${currentSession.access_token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.usage) return;
+        localStorage.setItem(USAGE_KEY, JSON.stringify({
+            date: data.usage.date || getTodayKey(),
+            cloudSeconds: Number(data.usage.cloudSeconds) || 0,
+            aiRequests: Number(data.usage.aiRequests) || 0,
+            finalTranscribes: Number(data.usage.finalTranscribes) || 0
+        }));
+        if (data.plan) localStorage.setItem(PLAN_KEY, data.plan);
+        renderPremiumState();
+    } catch (e) {}
+}
+
+function formatMinutes(seconds) {
+    return getAppLanguage() === 'ko' ? `${Math.floor(seconds / 60)}분` : `${Math.floor(seconds / 60)} min`;
+}
+
+function renderPremiumState() {
+    const plan = getPlan();
+    const limits = getPlanLimits();
+    const usage = getUsage();
+    document.body.classList.toggle('premium-plan', plan !== 'free');
+
+    const badge = document.getElementById('plan-badge');
+    if (badge) badge.textContent = plan === 'free' ? 'Free' : (plan === 'team' ? 'Team' : 'Premium');
+
+    const meter = document.getElementById('premium-meter');
+    if (meter) {
+        meter.textContent = getUsageMeterText(limits, usage);
+    }
+
+    const historyLimit = document.getElementById('history-limit-label');
+    if (historyLimit) historyLimit.textContent = `저장 기록 ${getHistory().length}/${limits.historyItems}`;
+
+    const card = document.getElementById('premium-card');
+    if (card && plan !== 'free') card.classList.remove('attention');
+
+    renderAccountPanel();
+    initAds();
+}
+
+function activatePremiumDemo() {
+    if (!currentUser) {
+        openAuthModal("Premium 기능을 사용하려면 먼저 로그인하세요.");
+        return;
+    }
+    openPricingModal();
+}
+
+function enablePremiumDemo() {
+    showToast("보안상 데모로 Premium 권한을 켤 수 없습니다. 결제 링크 또는 관리자 웹훅으로만 적용됩니다.", "error", 6200);
+}
+
+function resetFreePlanDemo() {
+    localStorage.setItem(PLAN_KEY, 'free');
+    renderPremiumState();
+    renderHistory();
+    showToast("Free plan restored.");
+}
+
+function showUpgradePrompt(reason = getAppLanguage() === 'ko' ? "Premium 기능입니다." : "This is a Premium feature.") {
+    const suffix = getAppLanguage() === 'ko'
+        ? "Premium으로 업그레이드하면 계속 사용할 수 있습니다."
+        : "Upgrade to Premium to keep using it.";
+    showToast(`${reason} ${suffix}`, "error", 5200);
+    const card = document.getElementById('premium-card');
+    if (card) card.classList.add('attention');
+    openUpgradeModal(reason);
+}
+
+function getUsageMeterText(limits = getPlanLimits(), usage = getUsage()) {
+    return getAppLanguage() === 'ko'
+        ? `클라우드 ${formatMinutes(usage.cloudSeconds)}/${formatMinutes(limits.cloudSeconds)} · AI ${usage.aiRequests}/${limits.aiRequests} · 최종변환 ${usage.finalTranscribes}/${limits.finalTranscribes}`
+        : `Cloud ${formatMinutes(usage.cloudSeconds)}/${formatMinutes(limits.cloudSeconds)} · AI ${usage.aiRequests}/${limits.aiRequests} · Final transcribes ${usage.finalTranscribes}/${limits.finalTranscribes}`;
+}
+
+function openPricingModal() {
+    const modal = document.getElementById('pricing-modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closePricingModal() {
+    const modal = document.getElementById('pricing-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function openUpgradeModal(reason = getAppLanguage() === 'ko' ? "Premium 기능입니다." : "This is a Premium feature.") {
+    const modal = document.getElementById('upgrade-modal');
+    const reasonEl = document.getElementById('upgrade-modal-reason');
+    const usageEl = document.getElementById('upgrade-usage');
+    if (reasonEl) reasonEl.textContent = getAppLanguage() === 'ko'
+        ? `${reason} Premium으로 계속 사용할 수 있습니다.`
+        : `${reason} Continue with Premium.`;
+    if (usageEl) usageEl.textContent = getUsageMeterText();
+    if (modal) modal.classList.add('active');
+}
+
+function closeUpgradeModal() {
+    const modal = document.getElementById('upgrade-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function continueUpgradeFlow() {
+    closeUpgradeModal();
+    if (!currentUser) {
+        openAuthModal("Premium 기능을 사용하려면 먼저 로그인하세요.");
+        return;
+    }
+    openPricingModal();
+}
+
+async function startCheckout(plan = "premium") {
+    if (!currentUser) {
+        closePricingModal();
+        openAuthModal("결제를 시작하려면 먼저 로그인하세요.");
+        return;
+    }
+    try {
+        const config = await getPublicConfig();
+        const paymentUrl = plan === "pro" ? config.paymentUrlPro : config.paymentUrlPremium;
+        if (paymentUrl) {
+            const url = new URL(paymentUrl, window.location.href);
+            url.searchParams.set("email", currentUser.email || "");
+            url.searchParams.set("plan", plan);
+            window.location.href = url.toString();
+            return;
+        }
+        window.location.href = `mailto:smarttool_lee@naver.com?subject=LiveNote ${encodeURIComponent(plan)} 결제 문의&body=${encodeURIComponent(`계정: ${currentUser.email || currentUser.id}\n플랜: ${plan}\n`)}`;
+    } catch (e) {
+        showToast("결제 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "error", 5200);
+    }
+}
+
+async function handleBillingReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing") !== "success") return;
+    const applyBilling = async () => {
+        if (!currentSession?.access_token) return false;
+        await fetchServerUsage();
+        if (!isPremiumPlan()) return false;
+        showToast("결제가 확인되어 Premium이 적용되었습니다.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("billing");
+        url.searchParams.delete("plan");
+        window.history.replaceState({}, "", url.toString());
+        return true;
+    };
+    setTimeout(async () => {
+        if (!(await applyBilling())) {
+            openAuthModal("결제 확인을 계정에 연결하려면 로그인하세요. 결제 직후라면 잠시 후 새로고침해 주세요.");
+        }
+    }, 800);
+}
+
+async function initAuthState() {
+    renderAuthState();
+    try {
+        const client = await ensureSupabaseClient();
+        const { data } = await client.auth.getSession();
+        currentSession = data?.session || null;
+        currentUser = currentSession?.user || null;
+        enforcePremiumRequiresAuth();
+        renderAuthState();
+        if (currentUser) await fetchServerUsage();
+        client.auth.onAuthStateChange((_event, session) => {
+            currentSession = session || null;
+            currentUser = currentSession?.user || null;
+            enforcePremiumRequiresAuth();
+            renderAuthState();
+            if (currentUser) fetchServerUsage();
+            if (currentUser) closeAuthModal();
+        });
+    } catch (e) {
+        enforcePremiumRequiresAuth();
+        renderAuthState(e.message || "Auth is not configured.");
+    }
+}
+
+function renderAuthState(message = "") {
+    const authStatus = document.getElementById('auth-status');
+    const premiumBtn = document.getElementById('premium-activate-btn');
+    const mypageBtn = document.getElementById('mypage-btn');
+    if (authStatus) {
+        authStatus.textContent = currentUser
+            ? `로그인됨: ${currentUser.email || currentUser.id}`
+            : (message || authConfigError || "Premium 기능을 사용하려면 로그인하세요.");
+    }
+    if (premiumBtn) premiumBtn.textContent = "Premium";
+    if (mypageBtn) mypageBtn.textContent = currentUser ? uiText('myPage') : uiText('login');
+    renderAccountPanel();
+}
+
+function enforcePremiumRequiresAuth() {
+    if (!currentUser && getPlan() !== 'free') {
+        localStorage.setItem(PLAN_KEY, 'free');
+        renderPremiumState();
+    }
+}
+
+function openAuthModal(message = "") {
+    const modal = document.getElementById('auth-modal');
+    const note = document.getElementById('auth-modal-note');
+    if (note) note.textContent = message || authConfigError || "Premium 기능을 계정에 연결하려면 먼저 로그인하세요.";
+    if (modal) modal.classList.add('active');
+}
+
+function closeAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function openMyPage() {
+    if (!currentUser) {
+        openAuthModal("마이페이지와 Premium 기능을 사용하려면 로그인하세요.");
+        return;
+    }
+    renderAccountPanel();
+    const modal = document.getElementById('account-modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeAccountModal() {
+    const modal = document.getElementById('account-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function renderAccountPanel() {
+    const usage = getUsage();
+    const limits = getPlanLimits();
+    const email = document.getElementById('account-email');
+    const plan = document.getElementById('account-plan');
+    const cloud = document.getElementById('account-cloud-usage');
+    const ai = document.getElementById('account-ai-usage');
+    if (email) email.textContent = currentUser?.email || "-";
+    if (plan) plan.textContent = getPlan() === 'free' ? "Free" : (getPlan() === 'team' ? "Team" : "Premium");
+    if (cloud) cloud.textContent = `${formatMinutes(usage.cloudSeconds)}/${formatMinutes(limits.cloudSeconds)}`;
+    if (ai) ai.textContent = `${usage.aiRequests}/${limits.aiRequests}`;
+}
+
+async function signInWithGoogle() {
+    try {
+        const client = await ensureSupabaseClient();
+        const { error } = await client.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.href }
+        });
+        if (error) throw error;
+    } catch (e) {
+        renderAuthState(e.message || "Google login failed.");
+        showToast("로그인 설정을 확인해 주세요.", "error", 5200);
+    }
+}
+
+async function sendMagicLink() {
+    const emailInput = document.getElementById('auth-email');
+    const email = emailInput?.value.trim();
+    if (!email) {
+        showToast("이메일을 입력해 주세요.", "error");
+        return;
+    }
+    try {
+        const client = await ensureSupabaseClient();
+        const { error } = await client.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: window.location.href }
+        });
+        if (error) throw error;
+        showToast("로그인 링크를 이메일로 보냈습니다.");
+    } catch (e) {
+        renderAuthState(e.message || "Email login failed.");
+        showToast("이메일 로그인 설정을 확인해 주세요.", "error", 5200);
+    }
+}
+
+async function signOut() {
+    try {
+        const client = await ensureSupabaseClient();
+        await client.auth.signOut();
+    } catch (e) {}
+    currentUser = null;
+    currentSession = null;
+    localStorage.setItem(PLAN_KEY, 'free');
+    enforcePremiumRequiresAuth();
+    renderAuthState();
+    renderPremiumState();
+    showToast("로그아웃했습니다.");
+}
+
 function restoreAiSettings() {
     const enabled = localStorage.getItem('vlive_ai_personal_api_enabled') === 'true';
     const provider = localStorage.getItem('vlive_ai_provider') || 'gemini';
@@ -609,7 +1482,7 @@ function toggleAiSettings() {
     const btn = document.getElementById('ai-settings-toggle');
     if (!panel) return;
     panel.classList.toggle('active');
-    if (btn) btn.textContent = panel.classList.contains('active') ? "설정 닫기" : "AI 설정";
+    if (btn) btn.textContent = panel.classList.contains('active') ? uiText('closeSettings') : uiText('materialSettings');
 }
 
 function toggleAiPersonalApiSettings(shouldSave = true) {
@@ -658,12 +1531,12 @@ function updateAiSummary() {
     if (!summary) return;
     const enabled = document.getElementById('ai-personal-api-enabled')?.checked;
     if (!enabled) {
-        summary.textContent = "기본 AI API 사용 중 · 개인 키 선택 가능";
+        summary.textContent = uiText('serverCredit');
         return;
     }
     const provider = document.getElementById('ai-provider')?.value || 'gemini';
     const model = document.getElementById('ai-model')?.value || '';
-    summary.textContent = `개인 ${provider.toUpperCase()} API 사용 중${model ? ` · ${model}` : ""}`;
+    summary.textContent = `내 ${provider.toUpperCase()} API 키 사용 중${model ? ` · ${model}` : ""}`;
 }
 
 function getAiRequestSettings() {
@@ -678,7 +1551,7 @@ function getAiRequestSettings() {
 }
 
 function getMinutesType() {
-    return document.getElementById('minutes-type')?.value || 'meeting';
+    return document.getElementById('minutes-type')?.value || 'lecture';
 }
 
 async function translateCaptionChunk(text) {
@@ -699,7 +1572,16 @@ async function translateCaptionChunk(text) {
     }
     const aiSettings = getAiRequestSettings();
     if (aiSettings.provider !== 'default' && !aiSettings.apiKey) {
-        log("번역 자막에는 AI 개인 API 키를 입력하거나 개인 API 키 사용을 꺼주세요.", true);
+        log("번역 자막에는 내 AI API 키를 입력하거나 내 API 키 사용을 꺼주세요.", true);
+        return source;
+    }
+    const usesServerCredit = aiSettings.provider === 'default';
+    if (usesServerCredit && !currentUser) {
+        openAuthModal("번역 자막은 로그인 후 사용할 수 있습니다.");
+        return source;
+    }
+    if (usesServerCredit && !hasQuota('aiRequests', 1)) {
+        showUpgradePrompt("무료 AI 번역 횟수를 모두 사용했습니다.");
         return source;
     }
     try {
@@ -707,7 +1589,10 @@ async function translateCaptionChunk(text) {
         lastTranslationAt = now;
         const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+            },
             body: JSON.stringify({
                 text: source,
                 mode: 'translate',
@@ -718,6 +1603,7 @@ async function translateCaptionChunk(text) {
             })
         });
         const data = await res.json();
+        if (usesServerCredit && res.ok) incrementUsage('aiRequests', 1);
         if (!res.ok || !data.result) {
             log(data.result || "번역 자막 요청 실패", true);
             return source;
@@ -748,7 +1634,73 @@ function getHistory() {
 }
 
 function setHistory(items) {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 20)));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, getPlanLimits().historyItems)));
+}
+
+function synthesizeCaptionSegments(text) {
+    return String(text || "")
+        .split(/\n+/)
+        .map((line) => cleanText(line))
+        .filter(Boolean)
+        .map((line, index) => ({
+            text: line,
+            start: index * 4,
+            end: index * 4 + 4
+        }));
+}
+
+function getStoredCaptionSegments() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CAPTION_SEGMENTS_KEY) || "[]");
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .map((segment) => ({
+                text: cleanText(segment.text || ""),
+                start: Math.max(0, Number(segment.start) || 0),
+                end: Math.max(0, Number(segment.end) || 0)
+            }))
+            .filter((segment) => segment.text && segment.end > segment.start);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveCaptionSegments() {
+    localStorage.setItem(CAPTION_SEGMENTS_KEY, JSON.stringify(captionSegments.slice(-500)));
+}
+
+function resetCaptionSegments(segments = []) {
+    captionSegments = Array.isArray(segments)
+        ? segments
+            .map((segment) => ({
+                text: cleanText(segment.text || ""),
+                start: Math.max(0, Number(segment.start) || 0),
+                end: Math.max(0, Number(segment.end) || 0)
+            }))
+            .filter((segment) => segment.text && segment.end > segment.start)
+        : [];
+    saveCaptionSegments();
+}
+
+function startCaptionTimingSession() {
+    if (!transcriptText.trim()) resetCaptionSegments();
+    else if (!captionSegments.length) resetCaptionSegments(synthesizeCaptionSegments(transcriptText));
+    const lastEnd = captionSegments.length ? captionSegments[captionSegments.length - 1].end : 0;
+    sessionCaptionStartedAt = Date.now() - Math.round(lastEnd * 1000);
+}
+
+function addCaptionSegment(text, durationMs = 4000) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+    if (!sessionCaptionStartedAt) startCaptionTimingSession();
+    const elapsedEnd = Math.max(0, (Date.now() - sessionCaptionStartedAt) / 1000);
+    const duration = Math.max(0.5, (Number(durationMs) || 4000) / 1000);
+    const previousEnd = captionSegments.length ? captionSegments[captionSegments.length - 1].end : 0;
+    const start = Math.max(previousEnd, elapsedEnd - duration);
+    const end = Math.max(start + 0.5, elapsedEnd);
+    captionSegments.push({ text: cleaned, start, end });
+    captionSegments = captionSegments.slice(-500);
+    saveCaptionSegments();
 }
 
 function saveHistorySnapshot(text) {
@@ -757,10 +1709,14 @@ function saveHistorySnapshot(text) {
     const history = getHistory();
     const now = new Date();
     const latest = history[0];
+    const lessonMeta = getLessonMeta();
+    const fallbackTitle = content.slice(0, 42) + (content.length > 42 ? "..." : "");
     const item = {
         id: latest && now.getTime() - latest.updatedAt < 60000 ? latest.id : String(now.getTime()),
-        title: content.slice(0, 42) + (content.length > 42 ? "..." : ""),
+        title: lessonMeta.title || fallbackTitle,
+        lessonTitle: lessonMeta.title || "",
         text: content,
+        segments: content === transcriptText.trim() ? captionSegments.slice(-500) : [],
         updatedAt: now.getTime()
     };
     if (latest && item.id === latest.id) history[0] = item;
@@ -775,7 +1731,9 @@ function renderHistory() {
     const history = getHistory();
     list.replaceChildren();
     if (!history.length) {
-        list.textContent = "지난 자막이 없습니다. 실시간 자막이 생성되면 최근 내용이 이곳에 표시됩니다.";
+        list.textContent = getAppLanguage() === 'ko'
+            ? "지난 자막이 없습니다. 실시간 자막이 생성되면 최근 내용이 이곳에 표시됩니다."
+            : "No caption history yet. Recent captions will appear here after a live session.";
         return;
     }
     history.forEach((item) => {
@@ -786,9 +1744,9 @@ function renderHistory() {
         meta.className = 'history-meta';
 
         const title = document.createElement('strong');
-        title.textContent = item.title || "자막 기록";
+        title.textContent = item.lessonTitle || item.title || (getAppLanguage() === 'ko' ? "수업 자막 기록" : "Class caption history");
         const date = document.createElement('span');
-        date.textContent = new Date(item.updatedAt).toLocaleString();
+        date.textContent = `${new Date(item.updatedAt).toLocaleString()} · ${item.text.length.toLocaleString()}${getAppLanguage() === 'ko' ? '자' : ' chars'}`;
         const preview = document.createElement('p');
         preview.textContent = item.text.slice(0, 140) + (item.text.length > 140 ? "..." : "");
         meta.append(title, date, preview);
@@ -797,19 +1755,19 @@ function renderHistory() {
         actions.className = 'history-actions';
         const loadBtn = document.createElement('button');
         loadBtn.className = 'btn btn-pip';
-        loadBtn.textContent = "불러오기";
+        loadBtn.textContent = getAppLanguage() === 'ko' ? "불러오기" : "Load";
         loadBtn.onclick = () => loadHistoryItem(item.id);
         const minutesBtn = document.createElement('button');
         minutesBtn.className = 'btn btn-pip';
-        minutesBtn.textContent = "회의록";
+        minutesBtn.textContent = uiText('classMaterials');
         minutesBtn.onclick = () => createMinutesFromHistory(item.id);
         const downloadBtn = document.createElement('button');
         downloadBtn.className = 'btn btn-pip';
-        downloadBtn.textContent = "다운로드";
+        downloadBtn.textContent = getAppLanguage() === 'ko' ? "다운로드" : "Download";
         downloadBtn.onclick = () => downloadHistoryItem(item.id);
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn btn-pip';
-        deleteBtn.textContent = "삭제";
+        deleteBtn.textContent = getAppLanguage() === 'ko' ? "삭제" : "Delete";
         deleteBtn.onclick = () => deleteHistoryItem(item.id);
         actions.append(loadBtn, minutesBtn, downloadBtn, deleteBtn);
 
@@ -821,7 +1779,12 @@ function renderHistory() {
 function loadHistoryItem(id) {
     const item = getHistory().find((entry) => entry.id === id);
     if (!item) return;
-    setTranscriptText(item.text);
+    const titleInput = document.getElementById('lesson-title');
+    if (titleInput) {
+        titleInput.value = item.lessonTitle || item.title || "";
+        saveLessonMeta();
+    }
+    setTranscriptText(item.text, { segments: item.segments || [] });
     switchMode('youtube');
 }
 
@@ -861,6 +1824,92 @@ function downloadTranscript() {
     downloadTextFile(text, "LiveNote_자막.txt");
 }
 
+function loadSampleLesson() {
+    const titleInput = document.getElementById('lesson-title');
+    if (titleInput) titleInput.value = "중3 과학: 전류와 전압";
+    saveLessonMeta();
+    setTranscriptText([
+        "전류는 전하가 일정한 방향으로 이동하는 흐름입니다.",
+        "전압은 전류가 흐르게 만드는 전기적인 압력으로 이해할 수 있습니다.",
+        "저항이 커지면 같은 전압에서 전류는 작아집니다.",
+        "오늘 복습할 핵심은 전류, 전압, 저항의 관계와 옴의 법칙입니다."
+    ].join("\n"));
+    resetCaptionSegments([
+        { start: 0, end: 4, text: "전류는 전하가 일정한 방향으로 이동하는 흐름입니다." },
+        { start: 4, end: 9, text: "전압은 전류가 흐르게 만드는 전기적인 압력으로 이해할 수 있습니다." },
+        { start: 9, end: 13, text: "저항이 커지면 같은 전압에서 전류는 작아집니다." },
+        { start: 13, end: 18, text: "오늘 복습할 핵심은 전류, 전압, 저항의 관계와 옴의 법칙입니다." }
+    ]);
+    const aiArea = document.getElementById('youtube-ai');
+    if (aiArea) {
+        setPlainText(aiArea, [
+            "# 강의자료: 전류와 전압",
+            "",
+            "## 핵심 개념",
+            "- 전류: 전하가 일정한 방향으로 이동하는 흐름",
+            "- 전압: 전류가 흐르게 만드는 전기적인 압력",
+            "- 저항: 전류의 흐름을 방해하는 정도",
+            "",
+            "## 복습 질문",
+            "1. 전압이 같을 때 저항이 커지면 전류는 어떻게 변할까요?",
+            "2. 옴의 법칙에서 전류, 전압, 저항은 어떤 관계일까요?",
+            "",
+            "## 다음 수업 과제",
+            "- 회로도에서 전류 방향을 표시하고 전압/저항 값을 이용해 전류를 계산해 오기"
+        ].join("\n"));
+        localStorage.setItem('vlive_last_minutes', aiArea.innerText);
+    }
+    saveHistorySnapshot(transcriptText);
+    showToast("샘플 강의와 자료를 불러왔습니다.");
+}
+
+function getCaptionSegments() {
+    if (captionSegments.length) return captionSegments;
+    return synthesizeCaptionSegments(transcriptText);
+}
+
+function formatCueTime(totalSeconds, separator = ",") {
+    const safeTime = Math.max(0, Number(totalSeconds) || 0);
+    const seconds = Math.floor(safeTime);
+    const milliseconds = String(Math.round((safeTime - seconds) * 1000)).padStart(3, "0");
+    const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
+    const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
+    const ss = String(seconds % 60).padStart(2, "0");
+    return `${hh}:${mm}:${ss}${separator}${milliseconds}`;
+}
+
+function buildCaptionExport(format) {
+    const segments = getCaptionSegments();
+    if (format === "vtt") {
+        return `WEBVTT\n\n${segments.map((segment) => {
+            return `${formatCueTime(segment.start, ".")} --> ${formatCueTime(segment.end, ".")}\n${segment.text}`;
+        }).join("\n\n")}\n`;
+    }
+    return `${segments.map((segment, index) => {
+        return `${index + 1}\n${formatCueTime(segment.start)} --> ${formatCueTime(segment.end)}\n${segment.text}`;
+    }).join("\n\n")}\n`;
+}
+
+function downloadTimedCaption(format) {
+    const normalizedFormat = format === "vtt" ? "vtt" : "srt";
+    if (!isPremiumPlan()) {
+        showUpgradePrompt("SRT/VTT 자막 내보내기는 Premium 기능입니다.");
+        return;
+    }
+    const segments = getCaptionSegments();
+    if (!segments.length) return alert("내보낼 자막이 없습니다.");
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(buildCaptionExport(normalizedFormat), `LiveNote_자막_${stamp}.${normalizedFormat}`);
+}
+
+function downloadSrtCaption() {
+    downloadTimedCaption("srt");
+}
+
+function downloadVttCaption() {
+    downloadTimedCaption("vtt");
+}
+
 async function createSmartMinutes() {
     await callAI(null, "minutes");
 }
@@ -868,7 +1917,7 @@ async function createSmartMinutes() {
 async function createMinutesFromHistory(id) {
     const item = getHistory().find((entry) => entry.id === id);
     if (!item) return;
-    setTranscriptText(item.text);
+    setTranscriptText(item.text, { segments: item.segments || [] });
     switchMode('youtube');
     await callAI(null, "minutes");
 }
@@ -881,10 +1930,10 @@ function getSmartMinutesText() {
 
 async function copySmartMinutes() {
     const text = getSmartMinutesText();
-    if (!text) return alert("복사할 회의록이 없습니다.");
+    if (!text) return alert("복사할 강의자료가 없습니다.");
     try {
         await navigator.clipboard.writeText(text);
-        log("회의록 Markdown을 복사했습니다.");
+        log("강의자료 Markdown을 복사했습니다.");
     } catch (e) {
         alert("브라우저에서 클립보드 복사를 허용하지 않았습니다.");
     }
@@ -892,9 +1941,54 @@ async function copySmartMinutes() {
 
 function downloadSmartMinutes() {
     const text = getSmartMinutesText();
-    if (!text) return alert("다운로드할 회의록이 없습니다.");
+    if (!text) return alert("다운로드할 강의자료가 없습니다.");
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadTextFile(text, `LiveNote_회의록_${stamp}.md`);
+    downloadTextFile(text, `LiveNote_강의노트_${stamp}.md`);
+}
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function downloadSmartMinutesPdf() {
+    const text = getSmartMinutesText();
+    if (!text) return alert("PDF로 저장할 강의자료가 없습니다.");
+    if (!isPremiumPlan()) {
+        showUpgradePrompt("강의자료 PDF 저장은 Premium 기능입니다.");
+        return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const printable = window.open("", "_blank", "width=900,height=1100");
+    if (!printable) {
+        showToast("팝업 차단을 해제한 뒤 다시 시도해 주세요.", "error");
+        return;
+    }
+    printable.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>LiveNote 강의노트 ${stamp}</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; margin: 40px; line-height: 1.65; }
+h1 { font-size: 24px; margin: 0 0 6px; }
+.meta { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+pre { white-space: pre-wrap; word-break: keep-all; font-family: inherit; font-size: 14px; }
+@media print { body { margin: 24mm; } }
+</style>
+</head>
+<body>
+<h1>LiveNote 강의노트</h1>
+<div class="meta">${stamp} · Premium PDF export</div>
+<pre>${escapeHtml(text)}</pre>
+<script>window.onload = () => window.print();<\/script>
+</body>
+</html>`);
+    printable.document.close();
 }
 
 function downloadTextFile(text, filename) {
@@ -927,6 +2021,7 @@ function startSessionRecording() {
         if (sessionRecorder && sessionRecorder.state === 'recording') return;
         sessionRecordingChunks = [];
         lastSessionRecording = null;
+        lastSessionRecordingDurationMs = 0;
         setRecordingButtons(false);
         const mimeType = getRecordingMimeType();
         sessionRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -935,6 +2030,7 @@ function startSessionRecording() {
         };
         sessionRecorder.onstop = () => {
             const type = sessionRecorder?.mimeType || mimeType || 'audio/webm';
+            lastSessionRecordingDurationMs = sessionRecordingStartedAt ? Date.now() - sessionRecordingStartedAt : 0;
             lastSessionRecording = new Blob(sessionRecordingChunks, { type });
             sessionRecordingChunks = [];
             setRecordingButtons(lastSessionRecording.size > 0);
@@ -946,6 +2042,7 @@ function startSessionRecording() {
             showToast("전체 녹음 저장 중 오류가 발생했습니다.", "error");
         };
         sessionRecorder.start(1000);
+        sessionRecordingStartedAt = Date.now();
         log("전체 녹음을 시작했습니다.");
         showToast("녹음 저장을 시작했습니다. 실시간 자막도 함께 실행됩니다.");
     } catch (e) {
@@ -981,7 +2078,10 @@ async function requestStt(formData) {
     if (location.protocol === "file:") {
         throw new Error("클라우드 자막은 file://에서 사용할 수 없습니다. 서버 주소로 열어 주세요.");
     }
-    const res = await fetch('/api/stt', { method: 'POST', body: formData });
+    const headers = currentSession?.access_token
+        ? { Authorization: `Bearer ${currentSession.access_token}` }
+        : {};
+    const res = await fetch('/api/stt', { method: 'POST', body: formData, headers });
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
         throw new Error("/api/stt 서버 함수가 실행 중이 아닙니다. Cloudflare Pages/Functions 또는 배포 주소에서 열어 주세요.");
@@ -1014,15 +2114,26 @@ async function transcribeSessionRecording() {
     try {
         log("녹음 파일 최종 변환을 시작합니다.");
         showToast("녹음 파일 최종 변환을 시작합니다.");
-        const lang = document.getElementById('lang-select')?.value || 'auto';
+        const lang = getRecognitionLanguageForServer();
         const sttSettings = getSttRequestSettings();
+        const usesServerCredit = sttSettings.provider === 'default';
+        if (usesServerCredit && !currentUser) {
+            openAuthModal("긴 녹음 최종 변환은 로그인 후 사용할 수 있습니다.");
+            return;
+        }
+        if (usesServerCredit && !hasQuota('finalTranscribes', 1)) {
+            showUpgradePrompt("무료 최종 변환 횟수를 모두 사용했습니다.");
+            return;
+        }
         const formData = new FormData();
         formData.append('file', lastSessionRecording, lastSessionRecording.type.includes('ogg') ? 'recording.ogg' : 'recording.webm');
+        formData.append('durationSeconds', Math.max(1, Math.ceil((lastSessionRecordingDurationMs || 0) / 1000)));
+        formData.append('usageMetric', 'finalTranscribes');
         if (lang !== 'auto') formData.append('language', lang);
         formData.append('provider', sttSettings.provider);
         if (sttSettings.provider !== 'default') {
             if (!sttSettings.apiKey) {
-                alert("개인 API 키를 입력하거나 개인 API 키 사용을 꺼주세요.");
+                alert("내 API 키를 입력하거나 내 API 키 사용을 꺼주세요.");
                 return;
             }
             formData.append('model', sttSettings.model);
@@ -1043,6 +2154,7 @@ async function transcribeSessionRecording() {
         setTranscriptText(cleaned);
         saveHistorySnapshot(cleaned);
         renderHistory();
+        if (usesServerCredit) incrementUsage('finalTranscribes', 1);
         log("녹음 파일 최종 변환이 완료되었습니다.");
         showToast("녹음 파일 최종 변환이 완료되었습니다.");
     } catch (e) {
@@ -1094,17 +2206,21 @@ function renderTranscriptDisplay() {
     setPlainText(el, visibleText);
 }
 
-function setTranscriptText(text) {
+function setTranscriptText(text, options = {}) {
     transcriptText = text || "";
     localStorage.setItem('vlive_transcript', transcriptText);
+    sessionCaptionStartedAt = 0;
+    resetCaptionSegments(options.segments || []);
     renderTranscriptDisplay();
 }
 
-function appendCaptionChunk(text) {
+function appendCaptionChunk(text, durationMs = 4000) {
     if (!text) return;
+    if (!sessionCaptionStartedAt) startCaptionTimingSession();
     const separator = transcriptText.trim() ? "\n" : "";
     transcriptText = `${transcriptText.trimEnd()}${separator}${text.trim()}`;
     localStorage.setItem('vlive_transcript', transcriptText);
+    addCaptionSegment(text, durationMs);
     const now = Date.now();
     if (now - lastHistorySaveAt > HISTORY_SAVE_INTERVAL_MS) {
         lastHistorySaveAt = now;
@@ -1129,6 +2245,10 @@ const appendAiMessage = (container, label, text, className = "") => {
 };
 
 function initAds() {
+    if (isPremiumPlan()) {
+        document.querySelectorAll('.ad-slot').forEach((slot) => slot.classList.remove('is-ready'));
+        return;
+    }
     // AdSense 승인 후 data-ad-slot에 실제 광고 단위 ID를 입력하면 자동으로 로드됩니다.
     document.querySelectorAll('.adsbygoogle').forEach((ad) => {
         const wrapper = ad.closest('.ad-slot');
@@ -1330,14 +2450,14 @@ async function transcribeLocal(audioFloat32, lang) {
     }
 }
 
-function setupMicrophoneSelect(message = "이용 가능한 마이크 선택") {
+function setupMicrophoneSelect(message = uiText('micSelect')) {
     const deviceSelect = document.getElementById('device-select');
     if (!deviceSelect) return;
     const placeholder = new Option(message, "", true, true);
     placeholder.disabled = true;
     deviceSelect.replaceChildren(
         placeholder,
-        new Option("마이크 권한 허용하기", MIC_PERMISSION_VALUE)
+        new Option(uiText('micPermission'), MIC_PERMISSION_VALUE)
     );
 }
 
@@ -1372,20 +2492,20 @@ async function initAudio() {
         deviceSelect.replaceChildren();
         const defaultOption = document.createElement('option');
         defaultOption.value = "";
-        defaultOption.textContent = "시스템 기본 마이크 사용";
+        defaultOption.textContent = getAppLanguage() === 'ko' ? "시스템 기본 마이크 사용" : "Use system default microphone";
         defaultOption.selected = !currentVal;
         deviceSelect.appendChild(defaultOption);
         selectableMics.forEach((mic, index) => {
             const option = document.createElement('option');
             option.value = mic.deviceId;
-            option.textContent = mic.label || `이름 없는 입력 장치 ${index + 1}`;
+            option.textContent = mic.label || (getAppLanguage() === 'ko' ? `이름 없는 입력 장치 ${index + 1}` : `Unnamed input device ${index + 1}`);
             option.selected = mic.deviceId === currentVal;
             deviceSelect.appendChild(option);
         });
         if (!selectableMics.length) {
             const emptyOption = document.createElement('option');
             emptyOption.value = "";
-            emptyOption.textContent = "이용 가능한 추가 마이크 없음";
+            emptyOption.textContent = getAppLanguage() === 'ko' ? "이용 가능한 추가 마이크 없음" : "No additional microphone available";
             emptyOption.disabled = true;
             deviceSelect.appendChild(emptyOption);
         }
@@ -1417,12 +2537,12 @@ async function initAudio() {
             requestAnimationFrame(draw);
         }
         draw();
-        setStatus("준비 완료", false);
+        setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
     } catch(e) {
         if (deviceSelect) {
-            setupMicrophoneSelect("마이크 권한이 필요합니다");
+            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한이 필요합니다" : "Microphone permission required");
         }
-        log("마이크 연결 실패: 브라우저 권한과 입력 장치를 확인하세요.", true);
+        log(getAppLanguage() === 'ko' ? "마이크 연결 실패: 브라우저 권한과 입력 장치를 확인하세요." : "Microphone connection failed. Check browser permission and input device.", true);
     }
 }
 
@@ -1492,24 +2612,33 @@ async function startProRec() {
         return;
     }
     const engine = document.getElementById('engine-select').value;
-    const lang = document.getElementById('lang-select').value;
+    const localLang = getRecognitionLanguage();
+    const serverLang = getRecognitionLanguageForServer();
     isProRunning = true;
     isProcessingChunk = false;
+    startCaptionTimingSession();
     document.getElementById('pro-start').disabled = true;
     document.getElementById('pro-stop').disabled = false;
     startSessionRecording();
-    setStatus(engine === 'groq' ? "클라우드 자막 중" : "자막 생성 중", true);
+    setStatus(
+        engine === 'groq'
+            ? (getAppLanguage() === 'ko' ? "클라우드 자막 중" : "Cloud captions running")
+            : (getAppLanguage() === 'ko' ? "자막 생성 중" : "Captions running"),
+        true
+    );
 
     if (engine === 'local-whisper') {
         showToast("내 기기에서 자막 생성을 시작합니다.");
-        startLocalWhisper(lang);
+        startLocalWhisper(localLang);
     } else {
         const sttSettings = getSttRequestSettings();
         const apiLabel = sttSettings.provider === 'default'
-            ? "기본 서버 API"
-            : `개인 ${sttSettings.provider.toUpperCase()} API`;
-        showToast(`${apiLabel}로 클라우드 자막을 시작합니다.`);
-        startGroqWhisper(lang);
+            ? "LiveNote 서버 크레딧"
+            : `내 ${sttSettings.provider.toUpperCase()} API 키`;
+        showToast(getAppLanguage() === 'ko'
+            ? `${apiLabel}로 클라우드 자막을 시작합니다.`
+            : `Starting cloud captions with ${apiLabel}.`);
+        startGroqWhisper(serverLang);
     }
 }
 
@@ -1542,7 +2671,7 @@ async function startLocalWhisper(lang) {
                 const text = await transcribeLocal(audioFloat32, lang);
                 document.getElementById('model-loading').style.display = 'none';
                 const cleaned = await prepareCaptionText(text);
-                if (cleaned && cleaned.length > 1) appendCaptionChunk(cleaned);
+                if (cleaned && cleaned.length > 1) appendCaptionChunk(cleaned, CAPTURE_TIMING.localRecordMs);
             } catch (e) {
                 log("로컬 자막 처리 실패: " + e.message, true);
                 showToast("로컬 자막 처리 중 오류가 발생했습니다.", "error");
@@ -1572,16 +2701,29 @@ function startGroqWhisper(lang) {
         isProcessingChunk = true;
         const sttSettings = getSttRequestSettings();
         try {
+            const usesServerCredit = sttSettings.provider === 'default';
+            const chunkSeconds = Math.ceil(CAPTURE_TIMING.cloudRecordMs / 1000);
+            if (usesServerCredit && !currentUser) {
+                openAuthModal("클라우드 고정밀 자막은 로그인 후 사용할 수 있습니다. 기본 접근성 자막은 로컬 모드에서 계속 사용할 수 있습니다.");
+                stopProRec();
+                return;
+            }
+            if (usesServerCredit && !hasQuota('cloudSeconds', chunkSeconds)) {
+                showUpgradePrompt("무료 클라우드 자막 시간이 모두 사용되었습니다.");
+                stopProRec();
+                return;
+            }
             const blob = await recordAudioChunk(CAPTURE_TIMING.cloudRecordMs, getCloudRecordingOptions(sttSettings.provider));
             if (blob.size < 2500) return;
             const formData = new FormData();
             formData.append('file', blob, blob.type.includes('ogg') ? 'audio.ogg' : 'audio.webm');
+            formData.append('durationSeconds', String(chunkSeconds));
             if (lang !== 'auto') formData.append('language', lang);
             formData.append('provider', sttSettings.provider);
             if (sttSettings.provider !== 'default') {
                 if (!sttSettings.apiKey) {
-                    log("개인 API 키를 입력하거나 개인 API 키 사용을 꺼주세요.", true);
-                    showToast("개인 API 키가 필요합니다.", "error");
+                    log("내 API 키를 입력하거나 내 API 키 사용을 꺼주세요.", true);
+                    showToast("내 API 키가 필요합니다.", "error");
                     stopProRec();
                     return;
                 }
@@ -1597,9 +2739,10 @@ function startGroqWhisper(lang) {
                 if (sttSettings.providerExtra) formData.append('providerExtra', sttSettings.providerExtra);
             }
             const data = await requestStt(formData);
+            if (usesServerCredit) incrementUsage('cloudSeconds', chunkSeconds);
             if (data.text) {
                 const cleaned = await prepareCaptionText(data.text);
-                if (cleaned) appendCaptionChunk(cleaned);
+                if (cleaned) appendCaptionChunk(cleaned, CAPTURE_TIMING.cloudRecordMs);
             }
         } catch (e) {
             log("클라우드 자막 연결 오류: " + e.message, true);
@@ -1631,15 +2774,15 @@ function stopProRec() {
     if (stopBtn) stopBtn.disabled = true;
     const interimText = document.getElementById('interim-text');
     if (interimText) interimText.innerText = ""; 
-    setStatus("IDLE", false);
+    setStatus(getAppLanguage() === 'ko' ? "대기 중" : "Idle", false);
     const modelLoading = document.getElementById('model-loading');
     if (modelLoading) modelLoading.style.display = 'none';
-    showToast("세션을 종료했습니다.");
+    showToast(getAppLanguage() === 'ko' ? "세션을 종료했습니다." : "Session ended.");
 }
 
 async function callAI(question = null, mode = "summary") {
     const text = transcriptText.trim();
-    if (text.length < 5) return log("데이터 부족", true);
+    if (text.length < 5) return log(getAppLanguage() === 'ko' ? "데이터 부족" : "Not enough caption text.", true);
     const aiArea = document.getElementById('youtube-ai');
     if (!aiArea) return;
     const trimmedQuestion = question ? question.trim() : "";
@@ -1648,20 +2791,35 @@ async function callAI(question = null, mode = "summary") {
         appendAiMessage(aiArea, "Q: ", trimmedQuestion);
         document.getElementById('chat-input').value = "";
     } else if (isMinutesMode) {
-        setPlainText(aiArea, "회의록을 작성 중...");
+        setPlainText(aiArea, getAppLanguage() === 'ko' ? "강의자료를 작성 중..." : "Creating class materials...");
     } else {
-        setPlainText(aiArea, "분석 중...");
+        setPlainText(aiArea, getAppLanguage() === 'ko' ? "분석 중..." : "Analyzing...");
     }
     try {
         const aiSettings = getAiRequestSettings();
         if (aiSettings.provider !== 'default' && !aiSettings.apiKey) {
-            log("AI 개인 API 키를 입력하거나 개인 API 키 사용을 꺼주세요.", true);
-            if (!trimmedQuestion) setPlainText(aiArea, "AI 개인 API 키를 입력하거나 개인 API 키 사용을 꺼주세요.");
+            log("내 AI API 키를 입력하거나 내 API 키 사용을 꺼주세요.", true);
+            if (!trimmedQuestion) setPlainText(aiArea, "내 AI API 키를 입력하거나 내 API 키 사용을 꺼주세요.");
+            return;
+        }
+        const usesServerCredit = aiSettings.provider === 'default';
+        if (usesServerCredit && !currentUser) {
+            openAuthModal("강의자료 정리는 로그인 후 사용할 수 있습니다. 기본 실시간 자막은 로그인 없이 사용할 수 있습니다.");
+            return;
+        }
+        if (usesServerCredit && !hasQuota('aiRequests', 1)) {
+            const message = "무료 AI 정리 횟수를 모두 사용했습니다.";
+            if (trimmedQuestion) appendAiMessage(aiArea, "A: ", `${message} Premium으로 강의자료, 질문, 번역 한도를 늘릴 수 있습니다.`);
+            else setPlainText(aiArea, `${message}\n\nPremium으로 업그레이드하면 강의자료, 질문, 번역을 계속 사용할 수 있습니다.`);
+            showUpgradePrompt(message);
             return;
         }
         const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+            },
             body: JSON.stringify({
                 text,
                 question: trimmedQuestion || null,
@@ -1673,6 +2831,7 @@ async function callAI(question = null, mode = "summary") {
             })
         });
         const data = await res.json();
+        if (usesServerCredit && res.ok) incrementUsage('aiRequests', 1);
         const result = data.result || "결과 오류";
         if (trimmedQuestion) appendAiMessage(aiArea, "A: ", result);
         else {

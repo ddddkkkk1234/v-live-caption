@@ -26,6 +26,8 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({
     supabaseUrl: env.SUPABASE_URL || "",
     supabaseAnonKey: env.SUPABASE_ANON_KEY || "",
+    paymentUrlPremium: env.PAYMENT_URL_PREMIUM || "",
+    paymentUrlPro: env.PAYMENT_URL_PRO || "",
   }), {
     headers: jsonHeaders(request, env),
   });
