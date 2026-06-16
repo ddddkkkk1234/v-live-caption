@@ -2529,6 +2529,27 @@ function setupMicrophoneSelect(message = uiText('micSelect')) {
     );
 }
 
+async function handleOutputSelectChange() {
+    const outputSelect = document.getElementById('output-select');
+    if (!outputSelect) return;
+    const deviceId = outputSelect.value;
+    localStorage.setItem('vlive_audio_output', deviceId);
+    
+    // 오디오 출력 장치 변경 (브라우저 지원 시)
+    try {
+        if (pipVideo && typeof pipVideo.setSinkId === 'function') {
+            await pipVideo.setSinkId(deviceId);
+        }
+        // AudioContext의 sinkId는 아직 실험적 기능인 경우가 많음
+        if (audioContext && typeof audioContext.setSinkId === 'function') {
+            await audioContext.setSinkId(deviceId);
+        }
+        log(`출력 장치를 변경했습니다: ${deviceId || "기본"}`);
+    } catch (e) {
+        log("출력 장치 변경 실패: " + e.message, true);
+    }
+}
+
 async function handleDeviceSelectChange() {
     const deviceSelect = document.getElementById('device-select');
     if (!deviceSelect || !deviceSelect.value) return;
@@ -2575,6 +2596,8 @@ async function initAudio() {
         }
         const devices = await navigator.mediaDevices.enumerateDevices();
         const mics = devices.filter(d => d.kind === 'audioinput');
+        const speakers = devices.filter(d => d.kind === 'audiooutput');
+
         const selectableMics = mics.filter(mic => mic.deviceId && mic.deviceId !== "default");
         const currentVal = selectableMics.some(mic => mic.deviceId === deviceId) ? deviceId : "";
         deviceSelect.replaceChildren();
@@ -2598,6 +2621,25 @@ async function initAudio() {
             deviceSelect.appendChild(emptyOption);
         }
         localStorage.setItem('vlive_audio_device', currentVal);
+
+        // 스피커(출력) 목록 업데이트
+        const outputSelect = document.getElementById('output-select');
+        if (outputSelect) {
+            outputSelect.replaceChildren();
+            const defaultSpeaker = document.createElement('option');
+            defaultSpeaker.value = "";
+            defaultSpeaker.textContent = getAppLanguage() === 'ko' ? "시스템 기본 스피커 사용" : "Use system default speaker";
+            outputSelect.appendChild(defaultSpeaker);
+
+            speakers.forEach((spk, index) => {
+                const option = document.createElement('option');
+                option.value = spk.deviceId;
+                option.textContent = spk.label || (getAppLanguage() === 'ko' ? `이름 없는 출력 장치 ${index + 1}` : `Unnamed output device ${index + 1}`);
+                outputSelect.appendChild(option);
+            });
+            const savedOutputId = localStorage.getItem('vlive_audio_output') || "";
+            if (speakers.some(s => s.deviceId === savedOutputId)) outputSelect.value = savedOutputId;
+        }
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
