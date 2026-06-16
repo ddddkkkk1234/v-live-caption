@@ -2700,8 +2700,12 @@ async function startProRec() {
     isProRunning = true;
     isProcessingChunk = false;
     startCaptionTimingSession();
+    
+    // UI 업데이트
+    document.body.classList.add('recording');
     document.getElementById('pro-start').disabled = true;
     document.getElementById('pro-stop').disabled = false;
+    
     startSessionRecording();
     setStatus(
         engine === 'groq'
