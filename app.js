@@ -2556,18 +2556,74 @@ async function handleDeviceSelectChange() {
     await initAudio();
 }
 
+async function refreshDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter(d => d.kind === 'audioinput');
+        const speakers = devices.filter(d => d.kind === 'audiooutput');
+
+        const deviceSelect = document.getElementById('device-select');
+        const outputSelect = document.getElementById('output-select');
+
+        if (deviceSelect) {
+            const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
+            deviceSelect.replaceChildren();
+            
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.textContent = getAppLanguage() === 'ko' ? "시스템 기본 마이크 사용" : "Use system default microphone";
+            deviceSelect.appendChild(defaultOption);
+
+            const selectableMics = mics.filter(mic => mic.deviceId && mic.deviceId !== "default");
+            selectableMics.forEach((mic, index) => {
+                const option = document.createElement('option');
+                option.value = mic.deviceId;
+                option.textContent = mic.label || (getAppLanguage() === 'ko' ? `마이크 ${index + 1}` : `Microphone ${index + 1}`);
+                if (mic.deviceId === savedDeviceId) option.selected = true;
+                deviceSelect.appendChild(option);
+            });
+
+            // 권한 요청 옵션을 항상 맨 아래에 추가 (재시도용)
+            const permOption = document.createElement('option');
+            permOption.value = MIC_PERMISSION_VALUE;
+            permOption.textContent = uiText('micPermission');
+            deviceSelect.appendChild(permOption);
+        }
+
+        if (outputSelect) {
+            outputSelect.replaceChildren();
+            const defaultSpeaker = document.createElement('option');
+            defaultSpeaker.value = "";
+            defaultSpeaker.textContent = getAppLanguage() === 'ko' ? "시스템 기본 스피커 사용" : "Use system default speaker";
+            outputSelect.appendChild(defaultSpeaker);
+
+            speakers.forEach((spk, index) => {
+                const option = document.createElement('option');
+                option.value = spk.deviceId;
+                option.textContent = spk.label || (getAppLanguage() === 'ko' ? `출력 장치 ${index + 1}` : `Output device ${index + 1}`);
+                outputSelect.appendChild(option);
+            });
+            const savedOutputId = localStorage.getItem('vlive_audio_output') || "";
+            if (speakers.some(s => s.deviceId === savedOutputId)) outputSelect.value = savedOutputId;
+        }
+    } catch (e) {
+        log("장치 목록 갱신 실패: " + e.message, true);
+    }
+}
+
 async function initAudio() {
     const deviceSelect = document.getElementById('device-select');
     try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             const msg = getAppLanguage() === 'ko' 
-                ? "브라우저가 마이크를 지원하지 않거나 HTTPS 보안 연결이 아닙니다. 주소가 https:// 로 시작하는지 확인하세요." 
-                : "Microphone not supported or not on HTTPS. Please check if the URL starts with https://";
+                ? "브라우저가 마이크를 지원하지 않거나 HTTPS 보안 연결이 아닙니다." 
+                : "Microphone not supported or not on HTTPS.";
             throw new Error(msg);
         }
 
         if (audioContext && audioContext.state !== 'closed') await audioContext.close();
         if (!deviceSelect) return;
+
         const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
         const requestedPermission = deviceSelect.value === MIC_PERMISSION_VALUE;
         let deviceId = requestedPermission ? "" : (deviceSelect.value || savedDeviceId);
@@ -2585,61 +2641,25 @@ async function initAudio() {
                 noiseSuppression: noiseSuppression 
             } 
         });
+
         if(stream) stream.getTracks().forEach(track => track.stop());
+        
         try {
             stream = await navigator.mediaDevices.getUserMedia(getConstraints(deviceId));
         } catch (e) {
-            if (!deviceId) throw e;
-            deviceId = "";
-            localStorage.removeItem('vlive_audio_device');
-            stream = await navigator.mediaDevices.getUserMedia(getConstraints(""));
+            // 특정 장치로 실패하면 기본 마이크로 재시도
+            if (deviceId) {
+                deviceId = "";
+                localStorage.removeItem('vlive_audio_device');
+                stream = await navigator.mediaDevices.getUserMedia(getConstraints(""));
+            } else {
+                throw e;
+            }
         }
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const mics = devices.filter(d => d.kind === 'audioinput');
-        const speakers = devices.filter(d => d.kind === 'audiooutput');
 
-        const selectableMics = mics.filter(mic => mic.deviceId && mic.deviceId !== "default");
-        const currentVal = selectableMics.some(mic => mic.deviceId === deviceId) ? deviceId : "";
-        deviceSelect.replaceChildren();
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = getAppLanguage() === 'ko' ? "시스템 기본 마이크 사용" : "Use system default microphone";
-        defaultOption.selected = !currentVal;
-        deviceSelect.appendChild(defaultOption);
-        selectableMics.forEach((mic, index) => {
-            const option = document.createElement('option');
-            option.value = mic.deviceId;
-            option.textContent = mic.label || (getAppLanguage() === 'ko' ? `이름 없는 입력 장치 ${index + 1}` : `Unnamed input device ${index + 1}`);
-            option.selected = mic.deviceId === currentVal;
-            deviceSelect.appendChild(option);
-        });
-        if (!selectableMics.length) {
-            const emptyOption = document.createElement('option');
-            emptyOption.value = "";
-            emptyOption.textContent = getAppLanguage() === 'ko' ? "이용 가능한 추가 마이크 없음" : "No additional microphone available";
-            emptyOption.disabled = true;
-            deviceSelect.appendChild(emptyOption);
-        }
-        localStorage.setItem('vlive_audio_device', currentVal);
-
-        // 스피커(출력) 목록 업데이트
-        const outputSelect = document.getElementById('output-select');
-        if (outputSelect) {
-            outputSelect.replaceChildren();
-            const defaultSpeaker = document.createElement('option');
-            defaultSpeaker.value = "";
-            defaultSpeaker.textContent = getAppLanguage() === 'ko' ? "시스템 기본 스피커 사용" : "Use system default speaker";
-            outputSelect.appendChild(defaultSpeaker);
-
-            speakers.forEach((spk, index) => {
-                const option = document.createElement('option');
-                option.value = spk.deviceId;
-                option.textContent = spk.label || (getAppLanguage() === 'ko' ? `이름 없는 출력 장치 ${index + 1}` : `Unnamed output device ${index + 1}`);
-                outputSelect.appendChild(option);
-            });
-            const savedOutputId = localStorage.getItem('vlive_audio_output') || "";
-            if (speakers.some(s => s.deviceId === savedOutputId)) outputSelect.value = savedOutputId;
-        }
+        // 성공 시 목록 갱신 및 저장
+        localStorage.setItem('vlive_audio_device', deviceId);
+        await refreshDevices();
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
@@ -2649,15 +2669,13 @@ async function initAudio() {
         const data = new Uint8Array(analyser.frequencyBinCount);
         
         let lastDrawTime = 0;
-        const drawFpsLimit = 15; // 마이크 레벨 업데이트는 초당 15회로 충분
+        const drawFpsLimit = 15;
 
         function draw(time) {
             if(!audioContext || audioContext.state === 'closed') return;
             requestAnimationFrame(draw);
-
             if (time - lastDrawTime < 1000 / drawFpsLimit) return;
             lastDrawTime = time;
-            
             if (isProRunning || pipActive) {
                 analyser.getByteFrequencyData(data);
                 let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
@@ -2666,20 +2684,21 @@ async function initAudio() {
                 const vLabel = document.getElementById('v-label');
                 if (vFill) vFill.style.width = Math.min(100, avg) + "%";
                 if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
-                
                 if (pipActive) updatePipCanvas();
             }
         }
         requestAnimationFrame(draw);
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
     } catch(e) {
-        // 권한 거부 시에도 목록을 완전히 비우지 않고 '권한 허용' 옵션을 남겨둠
-        if (deviceSelect) {
-            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한 필요" : "Mic Permission Required");
-        }
         const errorMsg = e.name === 'NotAllowedError' 
             ? (getAppLanguage() === 'ko' ? "마이크 권한이 거부되었습니다. 주소창 왼쪽의 '자물쇠' 아이콘을 눌러 권한을 허용해 주세요." : "Microphone permission denied. Click the 'Lock' icon in the address bar to allow it.")
             : (e.message || "마이크 연결 실패");
+        
+        // 진짜 권한 거부일 때만 UI에 반영
+        if (e.name === 'NotAllowedError' && deviceSelect) {
+            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한 필요" : "Mic Permission Required");
+        }
+        
         log(errorMsg, true);
         showToast(errorMsg, "error", 6000);
     }
