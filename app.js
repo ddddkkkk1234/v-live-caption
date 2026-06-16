@@ -2550,7 +2550,20 @@ async function initAudio() {
         const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
         const requestedPermission = deviceSelect.value === MIC_PERMISSION_VALUE;
         let deviceId = requestedPermission ? "" : (deviceSelect.value || savedDeviceId);
-        const getConstraints = (id) => ({ audio: { deviceId: id ? { exact: id } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } });
+
+        // 마이크 고급 설정 값 읽기
+        const noiseSuppression = document.getElementById('mic-noise-suppression')?.checked ?? true;
+        const echoCancellation = document.getElementById('mic-echo-cancellation')?.checked ?? true;
+        const autoGainControl = document.getElementById('mic-auto-gain')?.checked ?? true;
+
+        const getConstraints = (id) => ({ 
+            audio: { 
+                deviceId: id ? { exact: id } : undefined, 
+                autoGainControl: autoGainControl, 
+                echoCancellation: echoCancellation, 
+                noiseSuppression: noiseSuppression 
+            } 
+        });
         if(stream) stream.getTracks().forEach(track => track.stop());
         try {
             stream = await navigator.mediaDevices.getUserMedia(getConstraints(deviceId));
