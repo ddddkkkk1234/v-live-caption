@@ -2518,15 +2518,16 @@ async function transcribeLocal(audioFloat32, lang) {
     }
 }
 
-function setupMicrophoneSelect(message = uiText('micSelect')) {
-    const deviceSelect = document.getElementById('device-select');
-    if (!deviceSelect) return;
-    const placeholder = new Option(message, "", true, true);
-    placeholder.disabled = true;
-    deviceSelect.replaceChildren(
-        placeholder,
-        new Option(uiText('micPermission'), MIC_PERMISSION_VALUE)
-    );
+async function handleOutputSelectChange() {
+    const outputSelect = document.getElementById('output-select');
+    if (!outputSelect) return;
+    const deviceId = outputSelect.value;
+    localStorage.setItem('vlive_audio_output', deviceId);
+    try {
+        if (pipVideo && typeof pipVideo.setSinkId === 'function') await pipVideo.setSinkId(deviceId);
+        if (audioContext && typeof audioContext.setSinkId === 'function') await audioContext.setSinkId(deviceId);
+        log(`출력 장치 변경: ${deviceId || "기본"}`);
+    } catch (e) { log("출력 변경 실패: " + e.message, true); }
 }
 
 async function handleDeviceSelectChange() {
@@ -2535,49 +2536,66 @@ async function handleDeviceSelectChange() {
     await initAudio();
 }
 
+async function refreshDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter(d => d.kind === 'audioinput');
+        const speakers = devices.filter(d => d.kind === 'audiooutput');
+        const deviceSelect = document.getElementById('device-select');
+        const outputSelect = document.getElementById('output-select');
+
+        if (deviceSelect) {
+            const savedId = localStorage.getItem('vlive_audio_device') || "";
+            deviceSelect.replaceChildren();
+            deviceSelect.appendChild(new Option(getAppLanguage()==='ko'?"기본 마이크":"Default Mic", ""));
+            mics.forEach((m, i) => {
+                if (!m.deviceId || m.deviceId === 'default') return;
+                const opt = new Option(m.label || `마이크 ${i+1}`, m.deviceId);
+                if (m.deviceId === savedId) opt.selected = true;
+                deviceSelect.appendChild(opt);
+            });
+            deviceSelect.appendChild(new Option(uiText('micPermission'), MIC_PERMISSION_VALUE));
+        }
+        if (outputSelect) {
+            const savedOutId = localStorage.getItem('vlive_audio_output') || "";
+            outputSelect.replaceChildren();
+            outputSelect.appendChild(new Option(getAppLanguage()==='ko'?"기본 스피커":"Default Speaker", ""));
+            speakers.forEach((s, i) => {
+                if (!s.deviceId || s.deviceId === 'default') return;
+                const opt = new Option(s.label || `스피커 ${i+1}`, s.deviceId);
+                if (s.deviceId === savedOutId) opt.selected = true;
+                outputSelect.appendChild(opt);
+            });
+        }
+    } catch (e) {}
+}
+
 async function initAudio() {
     const deviceSelect = document.getElementById('device-select');
     try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("HTTPS 연결 필요");
         if (audioContext && audioContext.state !== 'closed') await audioContext.close();
         if (!deviceSelect) return;
-        const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
-        const requestedPermission = deviceSelect.value === MIC_PERMISSION_VALUE;
-        let deviceId = requestedPermission ? "" : (deviceSelect.value || savedDeviceId);
-        const getConstraints = (id) => ({ audio: { deviceId: id ? { exact: id } : undefined, autoGainControl: false, echoCancellation: false, noiseSuppression: false } });
-        if(stream) stream.getTracks().forEach(track => track.stop());
+
+        const savedId = localStorage.getItem('vlive_audio_device') || "";
+        const isReqPerm = deviceSelect.value === MIC_PERMISSION_VALUE;
+        let deviceId = isReqPerm ? "" : (deviceSelect.value || savedId);
+
+        if(stream) stream.getTracks().forEach(t => t.stop());
+        
+        // 최대한 유연한 권한 요청
         try {
-            stream = await navigator.mediaDevices.getUserMedia(getConstraints(deviceId));
+            const constraints = { audio: deviceId ? { deviceId: { ideal: deviceId } } : true };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (e) {
-            if (!deviceId) throw e;
-            deviceId = "";
-            localStorage.removeItem('vlive_audio_device');
-            stream = await navigator.mediaDevices.getUserMedia(getConstraints(""));
+            console.warn("Retrying with default mic...", e);
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const mics = devices.filter(d => d.kind === 'audioinput');
-        const selectableMics = mics.filter(mic => mic.deviceId && mic.deviceId !== "default");
-        const currentVal = selectableMics.some(mic => mic.deviceId === deviceId) ? deviceId : "";
-        deviceSelect.replaceChildren();
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = getAppLanguage() === 'ko' ? "시스템 기본 마이크 사용" : "Use system default microphone";
-        defaultOption.selected = !currentVal;
-        deviceSelect.appendChild(defaultOption);
-        selectableMics.forEach((mic, index) => {
-            const option = document.createElement('option');
-            option.value = mic.deviceId;
-            option.textContent = mic.label || (getAppLanguage() === 'ko' ? `이름 없는 입력 장치 ${index + 1}` : `Unnamed input device ${index + 1}`);
-            option.selected = mic.deviceId === currentVal;
-            deviceSelect.appendChild(option);
-        });
-        if (!selectableMics.length) {
-            const emptyOption = document.createElement('option');
-            emptyOption.value = "";
-            emptyOption.textContent = getAppLanguage() === 'ko' ? "이용 가능한 추가 마이크 없음" : "No additional microphone available";
-            emptyOption.disabled = true;
-            deviceSelect.appendChild(emptyOption);
-        }
-        localStorage.setItem('vlive_audio_device', currentVal);
+
+        const actualId = stream.getAudioTracks()[0]?.getSettings()?.deviceId || "";
+        if (actualId) localStorage.setItem('vlive_audio_device', actualId);
+        await refreshDevices();
+        if (deviceSelect && actualId) deviceSelect.value = actualId;
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
@@ -2587,15 +2605,11 @@ async function initAudio() {
         const data = new Uint8Array(analyser.frequencyBinCount);
         
         let lastDrawTime = 0;
-        const drawFpsLimit = 15; // 마이크 레벨 업데이트는 초당 15회로 충분
-
         function draw(time) {
             if(!audioContext || audioContext.state === 'closed') return;
             requestAnimationFrame(draw);
-
-            if (time - lastDrawTime < 1000 / drawFpsLimit) return;
+            if (time - lastDrawTime < 66) return;
             lastDrawTime = time;
-            
             if (isProRunning || pipActive) {
                 analyser.getByteFrequencyData(data);
                 let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
@@ -2604,17 +2618,18 @@ async function initAudio() {
                 const vLabel = document.getElementById('v-label');
                 if (vFill) vFill.style.width = Math.min(100, avg) + "%";
                 if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
-                
                 if (pipActive) updatePipCanvas();
             }
         }
         requestAnimationFrame(draw);
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
+        log("마이크 연결 성공");
     } catch(e) {
-        if (deviceSelect) {
-            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한이 필요합니다" : "Microphone permission required");
+        if (deviceSelect && e.name === 'NotAllowedError') {
+            setupMicrophoneSelect("마이크 권한 필요");
         }
-        log(getAppLanguage() === 'ko' ? "마이크 연결 실패: 브라우저 권한과 입력 장치를 확인하세요." : "Microphone connection failed. Check browser permission and input device.", true);
+        log("마이크 연결 실패: " + e.message, true);
+        showToast("마이크 오류: " + e.message, "error");
     }
 }
 
