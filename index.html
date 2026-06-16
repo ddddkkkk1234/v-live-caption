@@ -99,10 +99,6 @@
                         <select id="device-select" onchange="handleDeviceSelectChange()"><option value="">선택</option></select>
                     </div>
                     <div class="selector-item">
-                        <label>스피커</label>
-                        <select id="output-select" onchange="handleOutputSelectChange()"><option value="">기본 출력 장치</option></select>
-                    </div>
-                    <div class="selector-item">
                         <label>설정</label>
                         <div class="selector-inline">
                             <select id="engine-select" onchange="updateEngineSettingsVisibility()">
@@ -156,12 +152,6 @@
                                         <a href="https://console.groq.com/keys" target="_blank" class="btn-text-only small">Groq 키 발급 ↗</a>
                                         <a href="https://platform.openai.com/api-keys" target="_blank" class="btn-text-only small">OpenAI 키 발급 ↗</a>
                                     </div>
-                                </div>
-                                <div class="selector-box" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                                    <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; display: block; color: var(--primary);">마이크 고급 설정</label>
-                                    <label class="checkbox-row"><input type="checkbox" id="mic-noise-suppression" onchange="initAudio()" checked><span>소음 제거 (Noise Suppression)</span></label>
-                                    <label class="checkbox-row"><input type="checkbox" id="mic-echo-cancellation" onchange="initAudio()" checked><span>에코 제거 (Echo Cancellation)</span></label>
-                                    <label class="checkbox-row"><input type="checkbox" id="mic-auto-gain" onchange="initAudio()" checked><span>자동 볼륨 조절 (Auto Gain)</span></label>
                                 </div>
                             </div>
                         </div>
