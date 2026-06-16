@@ -2631,8 +2631,9 @@ async function initAudio() {
         requestAnimationFrame(draw);
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
     } catch(e) {
+        // 권한 거부 시에도 목록을 완전히 비우지 않고 '권한 허용' 옵션을 남겨둠
         if (deviceSelect) {
-            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한이 거부됨" : "Mic Permission Denied");
+            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한 필요" : "Mic Permission Required");
         }
         const errorMsg = e.name === 'NotAllowedError' 
             ? (getAppLanguage() === 'ko' ? "마이크 권한이 거부되었습니다. 주소창 왼쪽의 '자물쇠' 아이콘을 눌러 권한을 허용해 주세요." : "Microphone permission denied. Click the 'Lock' icon in the address bar to allow it.")
