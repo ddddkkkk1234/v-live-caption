@@ -2538,6 +2538,13 @@ async function handleDeviceSelectChange() {
 async function initAudio() {
     const deviceSelect = document.getElementById('device-select');
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            const msg = getAppLanguage() === 'ko' 
+                ? "브라우저가 마이크를 지원하지 않거나 HTTPS 보안 연결이 아닙니다. 주소가 https:// 로 시작하는지 확인하세요." 
+                : "Microphone not supported or not on HTTPS. Please check if the URL starts with https://";
+            throw new Error(msg);
+        }
+
         if (audioContext && audioContext.state !== 'closed') await audioContext.close();
         if (!deviceSelect) return;
         const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
@@ -2612,9 +2619,13 @@ async function initAudio() {
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
     } catch(e) {
         if (deviceSelect) {
-            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한이 필요합니다" : "Microphone permission required");
+            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한이 거부됨" : "Mic Permission Denied");
         }
-        log(getAppLanguage() === 'ko' ? "마이크 연결 실패: 브라우저 권한과 입력 장치를 확인하세요." : "Microphone connection failed. Check browser permission and input device.", true);
+        const errorMsg = e.name === 'NotAllowedError' 
+            ? (getAppLanguage() === 'ko' ? "마이크 권한이 거부되었습니다. 주소창 왼쪽의 '자물쇠' 아이콘을 눌러 권한을 허용해 주세요." : "Microphone permission denied. Click the 'Lock' icon in the address bar to allow it.")
+            : (e.message || "마이크 연결 실패");
+        log(errorMsg, true);
+        showToast(errorMsg, "error", 6000);
     }
 }
 
