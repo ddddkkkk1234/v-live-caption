@@ -35,8 +35,9 @@ const DISPLAY_TRANSCRIPT_LIMIT = 3000;
 const HISTORY_SAVE_INTERVAL_MS = 15000;
 const LOCAL_WHISPER_MODEL = "Xenova/whisper-tiny";
 const FALLBACK_WHISPER_MODEL = "Xenova/whisper-base";
-const LOCAL_MIN_RMS = 0.008;
-const CAPTURE_TIMING = { localRecordMs: 1700, cloudRecordMs: 3200, restartDelayMs: 200 };
+const LOCAL_MIN_RMS = 0.003; // 더 민감하게 수정 (기존 0.008)
+
+const CAPTURE_TIMING = { localRecordMs: 2000, cloudRecordMs: 3500, restartDelayMs: 300 };
 const PLAN_KEY = 'vlive_plan';
 const USAGE_KEY = 'vlive_usage_daily';
 const LESSON_META_KEY = 'vlive_lesson_meta';
