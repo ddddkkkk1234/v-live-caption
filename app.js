@@ -2569,107 +2569,63 @@ async function refreshDevices() {
             const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
             deviceSelect.replaceChildren();
             
-            const defaultOption = document.createElement('option');
-            defaultOption.value = "";
-            defaultOption.textContent = getAppLanguage() === 'ko' ? "시스템 기본 마이크 사용" : "Use system default microphone";
+            const defaultOption = new Option(getAppLanguage() === 'ko' ? "시스템 기본 마이크" : "System default mic", "");
             deviceSelect.appendChild(defaultOption);
 
-            const selectableMics = mics.filter(mic => mic.deviceId && mic.deviceId !== "default");
-            selectableMics.forEach((mic, index) => {
-                const option = document.createElement('option');
-                option.value = mic.deviceId;
-                option.textContent = mic.label || (getAppLanguage() === 'ko' ? `마이크 ${index + 1}` : `Microphone ${index + 1}`);
+            mics.forEach((mic, index) => {
+                if (!mic.deviceId || mic.deviceId === 'default') return;
+                const option = new Option(mic.label || `마이크 ${index + 1}`, mic.deviceId);
                 if (mic.deviceId === savedDeviceId) option.selected = true;
                 deviceSelect.appendChild(option);
             });
 
-            // 권한 요청 옵션을 항상 맨 아래에 추가 (재시도용)
-            const permOption = document.createElement('option');
-            permOption.value = MIC_PERMISSION_VALUE;
-            permOption.textContent = uiText('micPermission');
-            deviceSelect.appendChild(permOption);
+            deviceSelect.appendChild(new Option(uiText('micPermission'), MIC_PERMISSION_VALUE));
         }
 
         if (outputSelect) {
             outputSelect.replaceChildren();
-            const defaultSpeaker = document.createElement('option');
-            defaultSpeaker.value = "";
-            defaultSpeaker.textContent = getAppLanguage() === 'ko' ? "시스템 기본 스피커 사용" : "Use system default speaker";
-            outputSelect.appendChild(defaultSpeaker);
-
+            outputSelect.appendChild(new Option(getAppLanguage() === 'ko' ? "시스템 기본 스피커" : "System default speaker", ""));
             speakers.forEach((spk, index) => {
-                const option = document.createElement('option');
-                option.value = spk.deviceId;
-                option.textContent = spk.label || (getAppLanguage() === 'ko' ? `출력 장치 ${index + 1}` : `Output device ${index + 1}`);
+                if (!spk.deviceId || spk.deviceId === 'default') return;
+                const option = new Option(spk.label || `스피커 ${index + 1}`, spk.deviceId);
                 outputSelect.appendChild(option);
             });
             const savedOutputId = localStorage.getItem('vlive_audio_output') || "";
             if (speakers.some(s => s.deviceId === savedOutputId)) outputSelect.value = savedOutputId;
         }
-    } catch (e) {
-        log("장치 목록 갱신 실패: " + e.message, true);
-    }
+    } catch (e) { console.error("Refresh devices failed", e); }
 }
 
 async function initAudio() {
     const deviceSelect = document.getElementById('device-select');
     try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            const msg = getAppLanguage() === 'ko' 
-                ? "브라우저가 마이크를 지원하지 않거나 HTTPS 보안 연결이 아닙니다." 
-                : "Microphone not supported or not on HTTPS.";
-            throw new Error(msg);
-        }
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("HTTPS 연결이 아니거나 마이크를 지원하지 않는 브라우저입니다.");
 
-        if (audioContext && audioContext.state !== 'closed') await audioContext.close();
-        if (!deviceSelect) return;
-
+        if (audioContext) { try { await audioContext.close(); } catch(e){} }
+        
         const savedDeviceId = localStorage.getItem('vlive_audio_device') || "";
-        const requestedPermission = deviceSelect.value === MIC_PERMISSION_VALUE;
-        let deviceId = requestedPermission ? "" : (deviceSelect.value || savedDeviceId);
-
-        // 마이크 고급 설정 값 읽기
-        const noiseSuppression = document.getElementById('mic-noise-suppression')?.checked ?? true;
-        const echoCancellation = document.getElementById('mic-echo-cancellation')?.checked ?? true;
-        const autoGainControl = document.getElementById('mic-auto-gain')?.checked ?? true;
-
-        const getConstraints = (id) => ({ 
-            audio: { 
-                deviceId: id ? { exact: id } : undefined, 
-                autoGainControl: autoGainControl, 
-                echoCancellation: echoCancellation, 
-                noiseSuppression: noiseSuppression 
-            } 
-        });
+        const requestedPermission = deviceSelect?.value === MIC_PERMISSION_VALUE;
+        let deviceId = requestedPermission ? "" : (deviceSelect?.value || savedDeviceId);
 
         if(stream) stream.getTracks().forEach(track => track.stop());
         
+        // 1차 시도: 저장된 장치 (너무 엄격하지 않게 ideal 사용)
+        const constraints = { audio: deviceId ? { deviceId: { ideal: deviceId } } : true };
+        
         try {
-            // 1차 시도: 저장된 특정 장치 요청
-            const constraints = getConstraints(deviceId);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (e) {
-            console.warn("특정 마이크 요청 실패, 기본 장치로 재시도:", e);
-            // 2차 시도: 저장된 ID 삭제 후 기본 장치 요청
-            deviceId = "";
-            localStorage.removeItem('vlive_audio_device');
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            } catch (e2) {
-                throw e2; // 둘 다 실패하면 최종 에러 처리로 이동
-            }
+            console.warn("Retrying with default mic...");
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
 
-        // 성공 시 목록 갱신 및 실제 잡힌 장치 ID 저장
-        const activeTrack = stream.getAudioTracks()[0];
-        const activeSettings = activeTrack ? activeTrack.getSettings() : {};
-        const actualDeviceId = activeSettings.deviceId || deviceId;
+        // 성공 시 ID 저장 및 목록 갱신
+        const track = stream.getAudioTracks()[0];
+        const actualId = track?.getSettings()?.deviceId || "";
+        if (actualId) localStorage.setItem('vlive_audio_device', actualId);
         
-        if (actualDeviceId) localStorage.setItem('vlive_audio_device', actualDeviceId);
         await refreshDevices();
-        
-        // 목록에서 실제 선택된 장치와 동기화
-        if (deviceSelect && actualDeviceId) deviceSelect.value = actualDeviceId;
+        if (deviceSelect && actualId) deviceSelect.value = actualId;
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
@@ -2679,12 +2635,10 @@ async function initAudio() {
         const data = new Uint8Array(analyser.frequencyBinCount);
         
         let lastDrawTime = 0;
-        const drawFpsLimit = 15;
-
         function draw(time) {
             if(!audioContext || audioContext.state === 'closed') return;
             requestAnimationFrame(draw);
-            if (time - lastDrawTime < 1000 / drawFpsLimit) return;
+            if (time - lastDrawTime < 66) return; // 15fps
             lastDrawTime = time;
             if (isProRunning || pipActive) {
                 analyser.getByteFrequencyData(data);
@@ -2699,18 +2653,11 @@ async function initAudio() {
         }
         requestAnimationFrame(draw);
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
+        log("마이크가 정상적으로 연결되었습니다.");
     } catch(e) {
-        const errorMsg = e.name === 'NotAllowedError' 
-            ? (getAppLanguage() === 'ko' ? "마이크 권한이 거부되었습니다. 주소창 왼쪽의 '자물쇠' 아이콘을 눌러 권한을 허용해 주세요." : "Microphone permission denied. Click the 'Lock' icon in the address bar to allow it.")
-            : (e.message || "마이크 연결 실패");
-        
-        // 진짜 권한 거부일 때만 UI에 반영
-        if (e.name === 'NotAllowedError' && deviceSelect) {
-            setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 권한 필요" : "Mic Permission Required");
-        }
-        
-        log(errorMsg, true);
-        showToast(errorMsg, "error", 6000);
+        log("마이크 연결 실패: " + e.message, true);
+        showToast(e.message, "error");
+        if (deviceSelect) setupMicrophoneSelect(getAppLanguage() === 'ko' ? "마이크 재설정 필요" : "Mic Reset Required");
     }
 }
 
