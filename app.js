@@ -537,18 +537,30 @@ function applyShareParams() {
 }
 
 function switchMode(mode) {
-    document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+    // 1. 모든 컨테이너 숨기기
+    document.querySelectorAll('.container').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+    });
+    
+    // 2. 모든 네비게이션 아이템 활성화 해제
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     
+    // 3. 대상 컨테이너 보이기
     const targetContainer = document.getElementById(mode + '-container');
-    if (targetContainer) targetContainer.classList.add('active');
+    if (targetContainer) {
+        targetContainer.classList.add('active');
+        targetContainer.style.display = 'flex';
+    }
     
-    const navItems = document.querySelectorAll('.nav-item');
-    if (mode === 'youtube') navItems[0].classList.add('active');
-    else if (mode === 'mic') navItems[1].classList.add('active');
+    // 4. 해당하는 네비게이션 아이템 활성화
+    const targetNavItem = document.querySelector(`.nav-item[data-nav="${mode}"]`);
+    if (targetNavItem) targetNavItem.classList.add('active');
     
+    // 5. 기록 탭이면 렌더링
     if (mode === 'mic') renderHistory();
     
+    // 6. 모드 전환 시 녹음 중지
     stopProRec();
 }
 
@@ -599,6 +611,53 @@ async function copyShareLink() {
             input.select();
         }
         alert("복사가 막혔습니다. 링크 입력칸을 직접 복사해 주세요.");
+    }
+}
+
+function openShareModal() {
+    const url = getShareUrl();
+    if (!url) {
+        alert(getAppLanguage() === "ko" ? "방 번호를 먼저 입력하고 '연결'을 눌러주세요." : "Please enter a room ID and connect first.");
+        return;
+    }
+
+    const modal = document.getElementById('share-modal');
+    const qrImage = document.getElementById('modal-qr-image');
+    const shareInput = document.getElementById('modal-share-url');
+
+    if (shareInput) shareInput.value = url;
+    if (qrImage) {
+        qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
+    }
+    
+    if (modal) modal.classList.add('active');
+}
+
+function closeShareModal(event) {
+    const modal = document.getElementById('share-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function copyShareLinkFromModal() {
+    const url = getShareUrl();
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast(getAppLanguage() === "ko" ? "공유 링크를 복사했습니다." : "Share link copied.");
+        
+        // 버튼 텍스트 피드백
+        const btn = document.querySelector('.btn-copy-main');
+        if (btn) {
+            const originalText = btn.innerText;
+            btn.innerText = getAppLanguage() === "ko" ? "복사 완료!" : "Copied!";
+            const originalBg = btn.style.background;
+            btn.style.background = "#fff";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = originalBg || "#00E676";
+            }, 2000);
+        }
+    } catch (err) {
+        showToast("복사 실패", "error");
     }
 }
 
@@ -786,13 +845,22 @@ function toggleFocusMode() {
 }
 
 function toggleSettingsPanel() {
-    const panel = document.getElementById('settings-panel');
+    const card = document.getElementById('settings-card');
     const btn = document.getElementById('settings-toggle');
-    if (!panel) return;
-    panel.classList.toggle('active');
+    if (!card) return;
+    card.classList.toggle('collapsed');
     if (btn) {
-        btn.textContent = "⚙️";
-        btn.classList.toggle('active', panel.classList.contains('active'));
+        btn.classList.toggle('active', !card.classList.contains('collapsed'));
+    }
+}
+
+function toggleFooterExtras() {
+    const extras = document.getElementById('footer-extras');
+    const btn = document.getElementById('footer-extras-toggle');
+    if (!extras) return;
+    extras.classList.toggle('collapsed');
+    if (btn) {
+        btn.textContent = extras.classList.contains('collapsed') ? '더보기 ▾' : '접기 ▴';
     }
 }
 
@@ -888,13 +956,11 @@ function restoreApiSettings() {
     const apiKey = getSecretValue('vlive_stt_api_key', 'vlive_stt_key_storage');
     const keyStorage = localStorage.getItem('vlive_stt_key_storage') || 'local';
     const providerExtra = localStorage.getItem('vlive_stt_provider_extra') || '';
-    const diarization = localStorage.getItem('vlive_stt_diarization') === 'true';
     const enabledInput = document.getElementById('personal-api-enabled');
     const providerInput = document.getElementById('stt-provider');
     const apiKeyInput = document.getElementById('stt-api-key');
     const keyStorageInput = document.getElementById('stt-key-storage');
     const providerExtraInput = document.getElementById('stt-provider-extra');
-    const diarizationInput = document.getElementById('stt-diarization-enabled');
 
     if (enabledInput) enabledInput.checked = enabled;
     if (providerInput && STT_PROVIDER_MODELS[provider]) providerInput.value = provider;
@@ -902,7 +968,6 @@ function restoreApiSettings() {
     if (apiKeyInput) apiKeyInput.value = apiKey;
     if (keyStorageInput) keyStorageInput.value = keyStorage;
     if (providerExtraInput) providerExtraInput.value = providerExtra;
-    if (diarizationInput) diarizationInput.checked = diarization;
     togglePersonalApiSettings(false);
     updateApiSummary();
 }
@@ -997,13 +1062,12 @@ function saveApiSettings() {
     const apiKey = document.getElementById('stt-api-key')?.value || '';
     const keyStorage = document.getElementById('stt-key-storage')?.value || 'local';
     const providerExtra = document.getElementById('stt-provider-extra')?.value || '';
-    const diarization = document.getElementById('stt-diarization-enabled')?.checked ? 'true' : 'false';
     localStorage.setItem('vlive_personal_api_enabled', enabled);
     localStorage.setItem('vlive_stt_provider', provider);
     localStorage.setItem('vlive_stt_model', model);
     setSecretValue('vlive_stt_api_key', apiKey, 'vlive_stt_key_storage', keyStorage);
     localStorage.setItem('vlive_stt_provider_extra', providerExtra);
-    localStorage.setItem('vlive_stt_diarization', diarization);
+    localStorage.removeItem('vlive_stt_diarization');
     updateApiSummary();
 }
 
@@ -1481,8 +1545,8 @@ function toggleAiSettings() {
     const panel = document.getElementById('ai-settings-panel');
     const btn = document.getElementById('ai-settings-toggle');
     if (!panel) return;
-    panel.classList.toggle('active');
-    if (btn) btn.textContent = panel.classList.contains('active') ? uiText('closeSettings') : uiText('materialSettings');
+    panel.classList.toggle('collapsed');
+    if (btn) btn.textContent = panel.classList.contains('collapsed') ? uiText('materialSettings') : uiText('closeSettings');
 }
 
 function toggleAiPersonalApiSettings(shouldSave = true) {
@@ -1962,33 +2026,37 @@ function downloadSmartMinutesPdf() {
         showUpgradePrompt("강의자료 PDF 저장은 Premium 기능입니다.");
         return;
     }
+    
     const stamp = new Date().toISOString().slice(0, 10);
-    const printable = window.open("", "_blank", "width=900,height=1100");
-    if (!printable) {
-        showToast("팝업 차단을 해제한 뒤 다시 시도해 주세요.", "error");
-        return;
-    }
-    printable.document.write(`<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<title>LiveNote 강의노트 ${stamp}</title>
-<style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; margin: 40px; line-height: 1.65; }
-h1 { font-size: 24px; margin: 0 0 6px; }
-.meta { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
-pre { white-space: pre-wrap; word-break: keep-all; font-family: inherit; font-size: 14px; }
-@media print { body { margin: 24mm; } }
-</style>
-</head>
-<body>
-<h1>LiveNote 강의노트</h1>
-<div class="meta">${stamp} · Premium PDF export</div>
-<pre>${escapeHtml(text)}</pre>
-<script>window.onload = () => window.print();<\/script>
-</body>
-</html>`);
-    printable.document.close();
+    const lessonTitle = getLessonMeta().title || "강의노트";
+    
+    // PDF용 임시 컨테이너 생성
+    const element = document.createElement('div');
+    element.style.padding = '40px';
+    element.style.color = '#111827';
+    element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    
+    element.innerHTML = `
+        <h1 style="font-size: 24px; margin: 0 0 6px; border-bottom: 2px solid #00E676; padding-bottom: 10px;">${lessonTitle}</h1>
+        <div style="color: #6b7280; font-size: 13px; margin-bottom: 24px; margin-top: 10px;">생성일: ${stamp} · LiveNote Professional PDF</div>
+        <div style="white-space: pre-wrap; word-break: keep-all; font-size: 14px; line-height: 1.7;">${escapeHtml(text)}</div>
+    `;
+
+    const opt = {
+        margin: [15, 15],
+        filename: `LiveNote_${lessonTitle}_${stamp}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    showToast("PDF를 생성 중입니다...");
+    html2pdf().set(opt).from(element).save().then(() => {
+        showToast("PDF 다운로드가 완료되었습니다.");
+    }).catch(err => {
+        console.error("PDF 생성 오류:", err);
+        showToast("PDF 생성 중 오류가 발생했습니다.", "error");
+    });
 }
 
 function downloadTextFile(text, filename) {
@@ -2321,7 +2389,7 @@ function isLikelyWhisperHallucination(text) {
 
 function getAudioRms(samples) {
     if (!samples || !samples.length) return 0;
-    const stride = Math.max(1, Math.floor(samples.length / 16000));
+    const stride = Math.max(1, Math.floor(samples.length / 400)); // 샘플링 수 줄임
     let sum = 0;
     let count = 0;
     for (let i = 0; i < samples.length; i += stride) {
@@ -2518,10 +2586,16 @@ async function initAudio() {
         source.connect(analyser);
         const data = new Uint8Array(analyser.frequencyBinCount);
         
-        function draw() {
+        let lastDrawTime = 0;
+        const drawFpsLimit = 15; // 마이크 레벨 업데이트는 초당 15회로 충분
+
+        function draw(time) {
             if(!audioContext || audioContext.state === 'closed') return;
+            requestAnimationFrame(draw);
+
+            if (time - lastDrawTime < 1000 / drawFpsLimit) return;
+            lastDrawTime = time;
             
-            // 세션이 실행 중이거나 PIP가 활성 상태일 때만 분석 및 렌더링 수행
             if (isProRunning || pipActive) {
                 analyser.getByteFrequencyData(data);
                 let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
@@ -2531,12 +2605,10 @@ async function initAudio() {
                 if (vFill) vFill.style.width = Math.min(100, avg) + "%";
                 if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
                 
-                // PIP가 활성 상태일 때만 캔버스 렌더링 (성능 최적화)
                 if (pipActive) updatePipCanvas();
             }
-            requestAnimationFrame(draw);
         }
-        draw();
+        requestAnimationFrame(draw);
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
     } catch(e) {
         if (deviceSelect) {
@@ -2768,6 +2840,9 @@ function stopProRec() {
     whisperRequests.forEach(({ reject }) => reject(new Error("세션이 종료되었습니다.")));
     whisperRequests.clear();
     if (transcriptText.trim().length >= 10) saveHistorySnapshot(transcriptText);
+    
+    // UI 업데이트
+    document.body.classList.remove('recording');
     const startBtn = document.getElementById('pro-start');
     const stopBtn = document.getElementById('pro-stop');
     if (startBtn) startBtn.disabled = false; 
@@ -2841,3 +2916,4 @@ async function callAI(question = null, mode = "summary") {
         aiArea.scrollTop = aiArea.scrollHeight;
     } catch (e) { log("AI 오류", true); }
 }
+

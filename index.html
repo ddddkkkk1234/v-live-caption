@@ -7,7 +7,6 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-NN1579DFRM');
     </script>
     <script type="text/javascript">
@@ -19,553 +18,455 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LiveNote | Live lecture captions and AI class materials</title>
-    <meta name="description" content="Show live captions on screen and by link during class, then create lecture notes, SRT/VTT captions, and PDF materials in the browser.">
-    <meta name="keywords" content="live lecture captions, classroom captions, AI lecture notes, SRT captions, VTT captions, caption sharing, accessibility captions">
-    <meta property="og:title" content="LiveNote | Live lecture captions and AI class materials">
-    <meta property="og:description" content="Share captions by link during class, then create lecture notes and caption files after the session.">
-    <meta property="og:type" content="website">
-    <meta name="google-adsense-account" content="ca-pub-5553376072633585">
-    <link rel="canonical" href="/">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5553376072633585" crossorigin="anonymous"></script>
+    <title>LiveNote | 실시간 자막 및 AI 강의노트</title>
+    <meta name="description" content="강의 중 실시간 자막 송출 및 AI 기반 강의노트 자동 생성 도구">
+    
+    <!-- Three.js Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
+      }
+    }
+    </script>
     <link rel="stylesheet" href="style.css">
+    <style>
+      /* 배경 레이어 강제 고정 및 투과 설정 */
+      #floating-lines-container {
+        position: fixed;
+        inset: 0;
+        z-index: 0; /* 배경 레이어 */
+        pointer-events: none; /* UI 클릭 통과 필수 */
+        mix-blend-mode: screen;
+        background: #000;
+      }
+      #floating-lines-container canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+      /* UI 요소들이 배경 위에 확실히 떠 있도록 설정 */
+      header, main, footer, .auth-modal {
+        position: relative;
+        z-index: 1;
+      }
+    </style>
 </head>
 <body>
 
     <div id="model-loading"><div id="model-loading-fill"></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <!-- 플로팅 라인 배경 컨테이너 -->
+    <div id="floating-lines-container"></div>
+
     <header class="topbar">
         <div class="topbar-inner">
-        <div class="brand">
-            <span class="brand-mark" aria-hidden="true">L</span>
-            <span class="brand-copy">
-                <h1>LiveNote</h1>
-                <span>Live captions and AI notes</span>
-            </span>
-        </div>
-        <nav class="app-nav">
-            <div class="nav-item active" onclick="switchMode('youtube')">실시간 자막</div>
-            <div class="nav-item" onclick="switchMode('mic')">지난 자막</div>
-            <a class="nav-item" href="guide.html">사용 가이드</a>
-        </nav>
-        <div class="topbar-actions">
-            <div id="plan-badge" class="plan-badge">Free</div>
-            <button type="button" onclick="activatePremiumDemo()" id="premium-activate-btn" class="btn premium-nav-btn">Premium</button>
-            <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">시스템 준비됨</span></div>
-            <div class="volume-meter">
-                <span id="v-title" class="meter-title">마이크 감도</span>
-                <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
-                <span id="v-label" class="meter-value">0%</span>
+            <div class="brand" onclick="switchMode('youtube')" style="cursor:pointer">
+                <span class="brand-mark">L</span>
+                <span class="brand-copy"><h1>LiveNote</h1></span>
             </div>
-            <select id="lang-select" class="top-language-select" title="Language" aria-label="Language">
-                <option value="en" selected>English</option>
-                <option value="ko">Korean</option>
-                <option value="ja">Japanese</option>
-            </select>
-            <button type="button" onclick="openMyPage()" id="mypage-btn" class="btn account-btn">마이페이지</button>
-        </div>
+            <nav class="app-nav">
+                <div class="nav-item active" data-nav="youtube" onclick="switchMode('youtube')">실시간 자막</div>
+                <div class="nav-item" data-nav="mic" onclick="switchMode('mic')">지난 자막</div>
+                <a class="nav-item" href="guide.html">사용 가이드</a>
+            </nav>
+            <div class="topbar-actions">
+                <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">준비됨</span></div>
+                <div class="volume-meter">
+                    <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
+                    <span id="v-label" class="meter-value">0%</span>
+                </div>
+                <select id="lang-select" class="top-language-select">
+                    <option value="en">English</option>
+                    <option value="ko" selected>Korean</option>
+                </select>
+                <!-- 초미니멀리즘 프로필 아이콘 -->
+                <button type="button" onclick="openMyPage()" id="profile-btn" class="profile-icon-btn minimalist-profile" aria-label="마이페이지">
+                    <span style="color: #00B0FF; font-size: 1.4rem;">👤</span>
+                </button>
+            </div>
         </div>
     </header>
 
-    <nav class="app-nav">
-        <div class="nav-item active" onclick="switchMode('youtube')">실시간 자막</div>
-        <div class="nav-item" onclick="switchMode('mic')">지난 자막</div>
-        <a class="nav-item" href="guide.html">사용 가이드</a>
-    </nav>
-
-    <!-- 실시간 세션 (Live) 컨테이너 -->
-    <div id="youtube-container" class="container active">
-        <section class="intro-panel" aria-labelledby="intro-title">
-            <div>
-                <div class="origin-badge">LiveNote</div>
-                <h2 id="intro-title">강의 실시간 자막 송출</h2>
-                <p>강의 중 자막을 화면과 링크로 공유하고, 종료 후 강의노트와 SRT/VTT/PDF를 만듭니다.</p>
-            </div>
-        </section>
-        <div class="selector-box">
-            <div class="selector-item">
-                <label>이용 가능한 마이크</label>
-                <select id="device-select" onchange="handleDeviceSelectChange()">
-                    <option value="" selected>이용 가능한 마이크 선택</option>
-                    <option value="__request_mic_permission">마이크 권한 허용하기</option>
-                </select>
-            </div>
-            <div class="selector-item">
-                <label>자막 모드 선택 (Mode)</label>
-                <select id="engine-select" onchange="updateEngineSettingsVisibility()">
-                    <option value="local-whisper" selected>내 기기에서 처리</option>
-                    <option value="groq">클라우드 고정밀</option>
-                </select>
-            </div>
-            <div class="selector-item">
-                <label>Settings</label>
-                <button type="button" onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip settings-icon-btn" title="Language and caption settings" aria-label="Language and caption settings">⚙️</button>
-            </div>
-            <div class="selector-item">
-                <label>번역 언어</label>
-                <select id="translation-target">
-                    <option value="none" selected>번역 안 함</option>
-                    <option value="en">English</option>
-                    <option value="ko">Korean</option>
-                    <option value="ja">Japanese</option>
-                </select>
-            </div>
-            <div class="selector-item lesson-title-item">
-                <label>수업명</label>
-                <input type="text" id="lesson-title" class="custom-input" placeholder="예: 중3 과학 2단원" oninput="saveLessonMeta()">
-            </div>
-        </div>
-        <p class="lesson-note">수업명은 지난 자막에 함께 저장됩니다. 화자 구분이나 기관 자체 키는 고급 설정에서 선택할 수 있습니다.</p>
-
-        <section id="premium-card" class="premium-card" aria-label="Premium usage and upgrade">
-            <div>
-                <strong>강의자료 Premium 실험</strong>
-                <p id="premium-meter">클라우드 0분/10분 · AI 0/3 · 최종변환 0/1</p>
-            </div>
-            <div class="premium-actions">
-                <button type="button" onclick="activatePremiumDemo()" class="btn btn-start">강의 Premium 보기</button>
-                <button type="button" onclick="resetFreePlanDemo()" class="btn btn-pip">Free로 보기</button>
-                <button type="button" onclick="downloadSrtCaption()" class="btn btn-pip">SRT</button>
-                <button type="button" onclick="downloadVttCaption()" class="btn btn-pip">VTT</button>
-            </div>
-        </section>
-
-        <section class="lecture-flow" aria-label="LiveNote lecture workflow">
-            <div>
-                <span>1</span>
-                <strong>실시간 자막</strong>
-                <p>마이크 소리를 바로 큰 자막으로 보여줍니다.</p>
-            </div>
-            <div>
-                <span>2</span>
-                <strong>학생 링크 공유</strong>
-                <p>QR 링크로 학생 화면에 자막을 보냅니다.</p>
-            </div>
-            <div>
-                <span>3</span>
-                <strong>강의자료 생성</strong>
-                <p>강의노트와 SRT/VTT/PDF로 정리합니다.</p>
-            </div>
-        </section>
-
-        <section class="sample-output" aria-label="강의자료 샘플">
-            <div class="sample-copy">
-                <strong>샘플 결과물</strong>
-                <p>강의가 끝나면 자막 원문을 복습자료 형태로 정리합니다.</p>
-                <button type="button" onclick="loadSampleLesson()" class="btn btn-pip">샘플 적용</button>
-            </div>
-            <div class="sample-card">
-                <span>강의노트</span>
-                <strong>중3 과학: 전류와 전압</strong>
-                <p>핵심 개념 3개, 헷갈리는 용어, 복습 질문, 다음 수업 과제를 한 문서로 정리합니다.</p>
-            </div>
-            <div class="sample-card">
-                <span>자막 파일</span>
-                <strong>SRT / VTT</strong>
-                <p>녹화 강의 업로드에 바로 쓰는 시간표시 자막 파일을 만듭니다.</p>
-            </div>
-        </section>
-
-        <div id="api-settings" class="api-settings">
-            <div class="api-summary">
-                <div class="api-summary-text">
-                    <strong>클라우드 고정밀</strong>
-                    <span id="api-mode-summary">LiveNote 서버 크레딧 사용 중 · API 키 설정 없이 사용</span>
-                </div>
-                <button type="button" onclick="toggleApiDetail()" id="api-detail-toggle" class="btn btn-pip">고급 설정</button>
-            </div>
-            <div id="api-detail" class="api-detail">
-                <p class="api-settings-title">고급 API 설정</p>
-                <div class="selector-box">
-                    <label class="selector-item checkbox-row">
-                        <input type="checkbox" id="personal-api-enabled" onchange="togglePersonalApiSettings()">
-                        <span>내 API 키 사용</span>
-                    </label>
-                    <div class="selector-item api-key-item">
-                        <label>제공업체</label>
-                        <select id="stt-provider" onchange="updateProviderModelOptions()">
-                            <option value="groq">Groq</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="gladia">Gladia</option>
-                            <option value="speechmatics">Speechmatics</option>
-                            <option value="ibm">IBM Watson STT</option>
-                            <option value="azure">Microsoft Azure Speech</option>
-                        </select>
+    <main>
+        <!-- 실시간 세션 대시보드 (Restored) -->
+        <div id="youtube-container" class="container active">
+            <div class="dashboard-header">
+                <div class="dash-left">
+                    <div class="selector-item">
+                        <label>마이크</label>
+                        <select id="device-select" onchange="handleDeviceSelectChange()"><option value="">선택</option></select>
                     </div>
-                    <div class="selector-item api-key-item">
-                        <label>모델</label>
-                        <select id="stt-model" onchange="saveApiSettings()"></select>
+                    <div class="selector-item">
+                        <label>설정</label>
+                        <div class="selector-inline">
+                            <select id="engine-select" onchange="updateEngineSettingsVisibility()">
+                                <option value="local-whisper" selected>내 기기</option>
+                                <option value="groq">클라우드</option>
+                            </select>
+                            <button onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip">⚙️</button>
+                        </div>
                     </div>
-                    <div class="selector-item api-key-item">
-                        <label>API 키</label>
-                        <input type="password" id="stt-api-key" class="custom-input" placeholder="sk-... 또는 gsk_..." autocomplete="off" oninput="saveApiSettings()">
-                    </div>
-                    <div class="selector-item api-key-item">
-                        <label>키 저장 위치</label>
-                        <select id="stt-key-storage" onchange="saveApiSettings()">
-                            <option value="local">이 브라우저에 저장</option>
-                            <option value="session">이번 세션만 저장</option>
-                        </select>
-                    </div>
-                    <div class="selector-item api-key-item provider-extra-item">
-                        <label id="stt-extra-label">추가 설정</label>
-                        <input type="text" id="stt-provider-extra" class="custom-input" placeholder="서비스 URL 또는 리전" autocomplete="off" oninput="saveApiSettings()">
-                    </div>
-                    <label class="selector-item api-key-item checkbox-row diarization-item">
-                        <input type="checkbox" id="stt-diarization-enabled" onchange="saveApiSettings()">
-                        <span>화자 분리 사용</span>
-                    </label>
                 </div>
-                <p id="provider-help" class="settings-note">Free/Premium은 LiveNote 서버 크레딧으로 바로 사용할 수 있습니다. 개발자나 기관만 자체 API 키를 선택하세요.</p>
-                <p class="settings-note">내 API 키를 쓰면 LiveNote 사용량 한도 대신 해당 API 제공업체 비용이 직접 발생합니다. 키는 이 브라우저에만 저장됩니다.</p>
-                <div class="api-help">
-                    <button type="button" onclick="promptGroqApiKey()" class="btn btn-pip">Groq 키 테스트 입력</button>
-                    <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq API 키 만들기</a>
-                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API 키 만들기</a>
-                    <a href="https://app.gladia.io/" target="_blank" rel="noopener noreferrer">Gladia 가입</a>
-                    <a href="https://portal.speechmatics.com/" target="_blank" rel="noopener noreferrer">Speechmatics 가입</a>
-                    <a href="https://cloud.ibm.com/catalog/services/speech-to-text" target="_blank" rel="noopener noreferrer">IBM Watson STT</a>
-                    <a href="https://azure.microsoft.com/products/ai-services/ai-speech" target="_blank" rel="noopener noreferrer">Azure Speech</a>
+                <div class="dash-center">
+                    <button onclick="startProRec()" id="pro-start" class="btn-hero-start">
+                        <span class="icon">🎤</span><span class="text">자막 시작</span>
+                    </button>
+                    <button onclick="stopProRec()" id="pro-stop" class="btn-hero-stop" disabled>
+                        <span class="icon">⏹</span><span class="text">종료</span>
+                    </button>
+                </div>
+                <div class="dash-right">
+                    <div class="selector-item">
+                        <label>학생 공유</label>
+                        <div class="selector-inline">
+                            <input type="text" id="room-id" class="custom-input mini" placeholder="방 번호" oninput="updateShareLink()">
+                            <button onclick="toggleSharedConnection()" id="shared-connect-btn" class="btn btn-pip">연결</button>
+                        </div>
+                    </div>
+                    <div class="share-links">
+                        <button onclick="copyShareLink()" class="btn-text-only">링크 복사</button>
+                        <button onclick="openShareModal()" class="btn-text-only">QR 보기</button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div id="settings-panel" class="settings-panel">
-            <div class="selector-box">
-                <div class="selector-item">
-                    <label>글자 크기 (Size)</label>
-                    <input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()">
-                </div>
-                <div class="selector-item">
-                    <label>글자 색상 (Color)</label>
-                    <input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()">
-                </div>
-                <div class="selector-item">
-                    <label>자막 배경색 (Background)</label>
-                    <input type="color" id="caption-bg-picker" value="#000000" oninput="updateStyle()">
-                </div>
-                <div class="selector-item">
-                    <label>배경 투명도 (Opacity)</label>
-                    <input type="range" id="caption-bg-opacity" min="0" max="0.9" step="0.05" value="0" oninput="updateStyle()">
-                </div>
-            </div>
-            <p class="settings-note">변경한 설정은 실시간 자막, 공유 보기, PIP 모드에 즉시 반영되고 이 브라우저에 저장됩니다.</p>
-        </div>
-
-        <div class="content-grid">
-            <div class="card">
-                <div class="card-header">
-                    <h3><span>📺</span> 실시간 자막</h3>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;"><button onclick="clearTranscript()" class="btn btn-pip">초기화</button><button onclick="toggleFocusMode()" id="focus-mode-btn" class="btn btn-pip">큰 자막</button><button onclick="togglePIP()" class="btn btn-pip">PIP 모드</button></div>
-                </div>
-                <div id="youtube-scroll" class="scroll-area"><div id="youtube-text"></div><div id="interim-text" class="interim" style="display:inline; opacity:0.6;"></div></div>
-            </div>
-            <div class="card" style="border-color: rgba(124, 77, 255, 0.3);">
-                <div class="card-header">
-                    <h3><span>📚</span> 강의자료</h3>
-                    <button type="button" onclick="toggleAiSettings()" id="ai-settings-toggle" class="btn btn-pip">자료 설정</button>
-                </div>
-                <div class="chat-container">
-                    <div id="ai-settings-panel" class="ai-settings">
-                        <p class="ai-settings-title">강의자료 고급 API 설정</p>
-                        <div class="selector-box">
-                            <label class="selector-item checkbox-row">
-                                <input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()">
-                                <span>내 API 키 사용</span>
-                            </label>
-                            <div class="selector-item ai-key-item">
-                                <label>제공업체</label>
-                                <select id="ai-provider" onchange="updateAiModelOptions()">
-                                    <option value="gemini">Google Gemini</option>
-                                    <option value="openai">OpenAI</option>
-                                    <option value="groq">Groq</option>
-                                </select>
+            <!-- 통합 설정 카드 (API 설정 + 자막 스타일) - 기본 닫힘 -->
+            <div id="settings-card" class="settings-card collapsed">
+                <div class="settings-grid">
+                    <!-- 좌측: API 설정 -->
+                    <div class="settings-col">
+                        <div id="api-settings" class="api-settings">
+                            <div class="api-summary">
+                                <div class="api-summary-text"><strong>클라우드 고정밀</strong> <span id="api-mode-summary">LiveNote 서버 사용 중</span></div>
+                                <button onclick="toggleApiDetail()" id="api-detail-toggle" class="btn btn-pip">고급 설정</button>
                             </div>
-                            <div class="selector-item ai-key-item">
-                                <label>모델</label>
-                                <select id="ai-model" onchange="saveAiSettings()"></select>
-                            </div>
-                            <div class="selector-item ai-key-item">
-                                <label>API 키</label>
-                                <input type="password" id="ai-api-key" class="custom-input" placeholder="AI API 키" autocomplete="off" oninput="saveAiSettings()">
-                            </div>
-                            <div class="selector-item ai-key-item">
-                                <label>키 저장 위치</label>
-                                <select id="ai-key-storage" onchange="saveAiSettings()">
-                                    <option value="local">이 브라우저에 저장</option>
-                                    <option value="session">이번 세션만 저장</option>
-                                </select>
+                            <div id="api-detail" class="api-detail">
+                                <div class="selector-box">
+                                    <label class="checkbox-row"><input type="checkbox" id="personal-api-enabled" onchange="togglePersonalApiSettings()"><span>내 API 키 사용</span></label>
+                                    <div class="selector-item api-key-item"><label>제공업체</label><select id="stt-provider" onchange="updateProviderModelOptions()"><option value="groq">Groq</option><option value="openai">OpenAI</option></select></div>
+                                    <div class="selector-item api-key-item"><label>모델</label><select id="stt-model" onchange="saveApiSettings()"></select></div>
+                                    <div class="selector-item api-key-item"><label>API 키</label><input type="password" id="stt-api-key" class="custom-input" oninput="saveApiSettings()"></div>
+                                    <div class="api-helper-links">
+                                        <a href="https://console.groq.com/keys" target="_blank" class="btn-text-only small">Groq 키 발급 ↗</a>
+                                        <a href="https://platform.openai.com/api-keys" target="_blank" class="btn-text-only small">OpenAI 키 발급 ↗</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <p id="ai-mode-summary" class="settings-note">LiveNote 서버 크레딧 사용 중 · API 키 설정 없이 사용</p>
                     </div>
-                    <div id="youtube-ai" class="scroll-area">강의가 끝나면 핵심 요약, 복습 포인트, 과제 힌트를 자료로 정리합니다.</div>
-                    <div class="ad-slot ad-ai" aria-label="AI 요약 결과 아래 광고 영역">
-                        <ins class="adsbygoogle"
-                             style="display:block"
-                             data-ad-client="ca-pub-5553376072633585"
-                             data-ad-slot=""
-                             data-ad-format="auto"
-                             data-full-width-responsive="true"></ins>
-                    </div>
-                    <div class="chat-input-box">
-                        <input type="text" id="chat-input" placeholder="자막 내용에 대해 질문하세요" onkeypress="if(event.keyCode==13) callAI(this.value)">
-                        <button onclick="callAI(document.getElementById('chat-input').value)" class="btn-send">전송</button>
-                    </div>
-                    <div class="minutes-actions">
-                        <select id="minutes-type" class="custom-input mini-select">
-                            <option value="meeting">회의록</option>
-                            <option value="lecture" selected>강의 노트</option>
-                            <option value="consulting">상담 기록</option>
-                        </select>
-                        <button onclick="createSmartMinutes()" class="btn btn-download">자료 만들기</button>
-                        <button onclick="copySmartMinutes()" class="btn btn-pip">Markdown 복사</button>
-                        <button onclick="downloadSmartMinutes()" class="btn btn-pip">MD 다운로드</button>
-                        <button onclick="downloadSmartMinutesPdf()" class="btn btn-pip">PDF</button>
+                    <!-- 우측: 자막 스타일 설정 -->
+                    <div class="settings-col">
+                        <div id="settings-panel" class="settings-panel">
+                            <div class="selector-box">
+                                <div class="selector-item"><label>크기</label><input type="range" id="font-size-slider" min="1" max="4" step="0.1" value="1.4" oninput="updateStyle()"></div>
+                                <div class="selector-item"><label>색상</label><input type="color" id="text-color-picker" value="#FFEB3B" oninput="updateStyle()"></div>
+                                <div class="selector-item"><label>배경</label><input type="color" id="caption-bg-picker" value="#000000" oninput="updateStyle()"></div>
+                                <div class="selector-item"><label>투명도</label><input type="range" id="caption-bg-opacity" min="0" max="0.9" step="0.05" value="0" oninput="updateStyle()"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="controls">
-            <button onclick="startProRec()" id="pro-start" class="btn btn-start">자막 시작</button>
-            <button onclick="stopProRec()" id="pro-stop" class="btn btn-stop" disabled>세션 종료</button>
-            <button onclick="callAI()" class="btn btn-download" style="background:var(--ai-glow); color:white; border:none;">✨ 핵심 정리</button>
-            <button onclick="createSmartMinutes()" class="btn btn-download">📝 강의자료 만들기</button>
-            <button onclick="downloadTranscript()" class="btn btn-download">📥 TXT 다운로드</button>
-            <button onclick="downloadSessionRecording()" id="recording-download" class="btn btn-download" disabled>녹음 다운로드</button>
-            <button onclick="transcribeSessionRecording()" id="recording-transcribe" class="btn btn-download" disabled>최종 변환</button>
-            <button onclick="switchMode('shared')" class="btn btn-download">학생 링크 공유</button>
-        </div>
-        <div class="ad-slot ad-controls" aria-label="다운로드 버튼 근처 광고 영역">
-            <ins class="adsbygoogle"
-                 style="display:block"
-                 data-ad-client="ca-pub-5553376072633585"
-                 data-ad-slot=""
-                 data-ad-format="horizontal"
-                 data-full-width-responsive="true"></ins>
-        </div>
-
-        <div id="debug-log">시스템 준비 완료.</div>
-    </div>
-
-    <!-- 공유 자막 컨테이너 -->
-    <div id="shared-container" class="container">
-        <div class="privacy-note">
-            <strong>공유 보기 베타</strong>
-            같은 방 번호를 사용하는 기기끼리 자막을 같이 보는 보조 기능입니다. 개인 대화나 민감한 내용은 공유하지 않는 것을 권장합니다.
-            <button onclick="switchMode('youtube')" class="btn btn-pip" style="margin-top:10px;">실시간 자막으로 돌아가기</button>
-        </div>
-        <div class="selector-box">
-            <div class="selector-item">
-                <label>방 번호 (Room ID)</label>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="room-id" class="custom-input" placeholder="방 번호를 입력하거나 생성하세요" oninput="updateShareLink()">
-                    <button onclick="generateRoomID()" class="btn btn-pip" style="white-space:nowrap; width: auto;">ID 생성</button>
+            <div class="content-grid">
+                <div class="card transcript-card">
+                    <div class="card-header">
+                        <h3>📺 실시간 자막</h3>
+                        <div class="header-actions">
+                            <button onclick="toggleFocusMode()" id="focus-mode-btn" class="btn btn-pip">크게</button>
+                            <button onclick="togglePIP()" class="btn btn-pip">PIP</button>
+                            <button onclick="clearTranscript()" class="btn btn-pip">비우기</button>
+                        </div>
+                    </div>
+                    <div class="caption-title-bar">
+                        <input type="text" id="lesson-title" class="custom-input lesson-input" placeholder="수업명 입력" oninput="saveLessonMeta()">
+                    </div>
+                    <div id="youtube-scroll" class="scroll-area"><div id="youtube-text"></div><div id="interim-text" class="interim"></div></div>
+                </div>
+                <div class="card ai-card">
+                    <div class="card-header">
+                        <h3>📚 강의노트 / 질문</h3>
+                        <div class="header-actions">
+                            <button onclick="toggleAiSettings()" id="ai-settings-toggle" class="btn btn-pip">설정</button>
+                            <button onclick="createSmartMinutes()" class="btn-ai-generate">✨ 생성</button>
+                        </div>
+                    </div>
+                    <div class="chat-container">
+                        <div id="ai-settings-panel" class="ai-settings collapsed">
+                            <div class="selector-box">
+                                <label class="checkbox-row"><input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()"><span>내 API 키</span></label>
+                                <div class="selector-item ai-key-item"><label>업체</label><select id="ai-provider" onchange="updateAiModelOptions()"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></div>
+                                <div class="selector-item ai-key-item"><label>모델</label><select id="ai-model" onchange="saveAiSettings()"></select></div>
+                                <div class="selector-item ai-key-item"><label>키</label><input type="password" id="ai-api-key" class="custom-input" oninput="saveAiSettings()"></div>
+                                <div class="api-helper-links">
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn-text-only small">Gemini 키 발급 ↗</a>
+                                    <a href="https://platform.openai.com/api-keys" target="_blank" class="btn-text-only small">OpenAI 키 발급 ↗</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="youtube-ai" class="scroll-area">강의 종료 후 생성 버튼을 누르세요.</div>
+                        <div class="chat-input-box">
+                            <input type="text" id="chat-input" placeholder="질문하기" onkeypress="if(event.keyCode==13) callAI(this.value)">
+                            <button onclick="callAI(document.getElementById('chat-input').value)" class="btn-send">전송</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="selector-item">
-                <label>현재 상태</label>
-                <div id="shared-status" style="font-size:0.9rem; color:var(--text-muted); padding: 10px;">연결 대기 중...</div>
-            </div>
-            <div class="selector-item">
-                <label>역할 선택</label>
-                <select id="role-select">
-                    <option value="sender">보내기 (휴대폰용)</option>
-                    <option value="receiver" selected>받아보기 (PC/태블릿용)</option>
-                </select>
-            </div>
-        </div>
 
-        <div class="share-tools">
-            <div>
-                <div class="share-link-box">
-                    <input type="text" id="share-link" class="custom-input" readonly placeholder="방 번호를 만들면 공유 링크가 생성됩니다.">
-                    <button onclick="copyShareLink()" class="btn btn-pip" style="white-space:nowrap; width:auto;">링크 복사</button>
-                    <button onclick="copyStageLink()" class="btn btn-pip" style="white-space:nowrap; width:auto;">송출 링크</button>
-                    <button onclick="updateShareLink(true)" class="btn btn-pip" style="white-space:nowrap; width:auto;">QR 만들기</button>
+            <div class="dashboard-footer">
+                <div class="footer-card export-card">
+                    <span class="footer-card-label">내보내기</span>
+                    <div class="footer-card-actions">
+                        <button onclick="downloadTranscript()" class="btn-footer txt-btn">📄 TXT</button>
+                        <button onclick="downloadSrtCaption()" class="btn-footer">SRT</button>
+                        <button onclick="downloadVttCaption()" class="btn-footer">VTT</button>
+                        <button onclick="downloadSmartMinutesPdf()" class="btn-footer">PDF</button>
+                    </div>
                 </div>
-                <p class="settings-note">청중은 링크나 QR로 바로 받아보기 모드에 들어올 수 있습니다. 송출 모드는 프로젝터/큰 화면용입니다.</p>
-            </div>
-            <div id="qr-box" class="qr-box" aria-label="공유 자막 접속 QR 코드">
-                <img id="qr-image" alt="공유 자막 접속 QR 코드">
-            </div>
-        </div>
-
-        <div class="card" style="margin-top:1.5rem; flex:1;">
-            <div class="card-header">
-                <h3><span>📡</span> 공유 보기</h3>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button onclick="toggleStageMode()" id="stage-mode-btn" class="btn btn-pip">송출 모드</button>
-                    <button onclick="clearSharedTranscript()" class="btn btn-pip">화면 비우기</button>
-                </div>
-            </div>
-            <div id="shared-scroll" class="scroll-area" style="height: 60vh;">
-                <div id="shared-text" style="font-size: 2.5rem; color: var(--caption-color); font-weight: 800; text-align: center; line-height: 1.4;">
-                    방 번호를 입력하고 접속하면 이곳에 자막이 표시됩니다.
+                <div class="footer-card share-card">
+                    <span class="footer-card-label">공유</span>
+                    <div class="footer-card-actions">
+                        <button onclick="switchMode('shared')" class="btn-footer">📡 공유 모드</button>
+                        <button onclick="openShareModal()" class="btn-footer">QR 코드</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="controls">
-            <button id="shared-connect-btn" onclick="toggleSharedConnection()" class="btn btn-start">연결하기</button>
+        <!-- 공유 QR 모달 -->
+        <div id="share-modal" class="modal-overlay" onclick="closeShareModal(event)">
+            <div class="modal-content share-modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeShareModal()">✕</button>
+                <h2 id="modal-title">자막 공유하기</h2>
+                <p class="modal-desc">학생들에게 이 화면을 보여주세요.</p>
+                <div id="modal-qr-container">
+                    <img id="modal-qr-image" src="" alt="QR Code">
+                </div>
+                <div class="modal-share-actions">
+                    <div class="share-url-box">
+                        <input type="text" id="modal-share-url" readonly>
+                        <button onclick="copyShareLinkFromModal()" class="btn-copy-main">링크 복사</button>
+                    </div>
+                    <p class="modal-hint">학생들이 스마트폰 카메라로 스캔하면 즉시 자막이 보입니다.</p>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- 저장 기록 컨테이너 -->
-    <div id="mic-container" class="container">
-        <div class="card">
-            <div class="card-header">
-                <h3><span>📁</span> 저장된 자막 기록</h3>
-                <button onclick="clearAllHistory()" class="btn btn-pip" style="color: var(--danger); border-color: rgba(255,82,82,0.2);">전체 삭제</button>
-            </div>
-            <div id="history-list" class="scroll-area">
-                저장된 기록이 없습니다.
+        <!-- 공유 세션 컨테이너 -->
+        <div id="shared-container" class="container">
+            <div class="card" style="flex:1;">
+                <div class="card-header"><h3>📡 공유 화면</h3><button onclick="switchMode('youtube')" class="btn btn-pip">돌아가기</button></div>
+                <div class="scroll-area" style="height: 60vh;"><div id="shared-text" style="font-size: 2rem; font-weight: 800; text-align: center; padding: 40px;">접속 후 자막이 표시됩니다.</div></div>
             </div>
         </div>
-    </div>
+
+        <!-- 지난 기록 컨테이너 -->
+        <div id="mic-container" class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📁 지난 자막 기록</h3>
+                    <button onclick="clearAllHistory()" class="btn btn-pip" style="color:var(--danger);">전체 삭제</button>
+                </div>
+                <div id="history-list" class="scroll-area" style="height: 70vh;">기록이 없습니다.</div>
+            </div>
+        </div>
+    </main>
 
     <footer>
-        <div class="footer-links">
-            <a href="privacy.html">개인정보처리방침</a>
-            <a href="terms.html">이용약관</a>
-            <a href="guide.html">사용 가이드</a>
-            <a href="mailto:smarttool_lee@naver.com">문의하기</a>
-        </div>
-        <p class="footer-info">© 2026 LiveNote. All rights reserved. <br> 로컬 자막은 브라우저에서 처리·저장되며, 클라우드/AI/공유 기능 사용 시 관련 데이터가 API로 전송될 수 있습니다. <br> Contact: <a class="email-link" href="mailto:smarttool_lee@naver.com">smarttool_lee@naver.com</a></p>
+        <p>© 2026 LiveNote. smarttool_lee@naver.com</p>
     </footer>
 
-    <div id="auth-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-        <div class="auth-dialog">
-            <div class="auth-header">
-                <div>
-                    <h3 id="auth-modal-title">Premium 로그인</h3>
-                    <p id="auth-modal-note">Premium 기능을 계정에 연결하려면 먼저 로그인하세요.</p>
-                </div>
-                <button type="button" onclick="closeAuthModal()" class="btn btn-pip">닫기</button>
-            </div>
-            <div class="auth-actions">
-                <button type="button" onclick="signInWithGoogle()" class="btn btn-start">Google로 계속</button>
-                <div class="auth-email-row">
-                    <input type="email" id="auth-email" class="custom-input" placeholder="email@example.com" autocomplete="email">
-                    <button type="button" onclick="sendMagicLink()" class="btn btn-download">이메일 링크</button>
-                </div>
-                <p id="auth-status" class="settings-note">Premium 기능을 사용하려면 로그인하세요.</p>
-            </div>
-        </div>
-    </div>
-
-    <div id="account-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
-        <div class="auth-dialog">
-            <div class="auth-header">
-                <div>
-                    <h3 id="account-modal-title">마이페이지</h3>
-                    <p>계정, 플랜, 사용량을 확인합니다.</p>
-                </div>
-                <button type="button" onclick="closeAccountModal()" class="btn btn-pip">닫기</button>
-            </div>
-            <div class="account-panel">
-                <div class="account-row"><span>이메일</span><strong id="account-email">-</strong></div>
-                <div class="account-row"><span>현재 플랜</span><strong id="account-plan">Free</strong></div>
-                <div class="account-row"><span>클라우드 사용량</span><strong id="account-cloud-usage">0분/10분</strong></div>
-                <div class="account-row"><span>AI 사용량</span><strong id="account-ai-usage">0/3</strong></div>
-                <div class="account-actions">
-                    <button type="button" onclick="activatePremiumDemo()" class="btn btn-start">Premium 업그레이드</button>
-                    <button type="button" onclick="signOut()" class="btn btn-download">로그아웃</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="pricing-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-modal-title">
-        <div class="auth-dialog pricing-dialog">
-            <div class="auth-header">
-                <div>
-                    <h3 id="pricing-modal-title">강의용 Premium으로 전환</h3>
-                    <p>기본 접근성 자막은 무료로 유지하고, 강의자료 생성·자막 파일·장시간 변환만 Premium으로 실험합니다.</p>
-                </div>
-                <button type="button" onclick="closePricingModal()" class="btn btn-pip">닫기</button>
-            </div>
-            <div class="pricing-grid">
-                <article class="price-card">
-                    <span class="price-label">Free</span>
-                    <strong>0원</strong>
-                    <p>기본 접근성 자막</p>
-                    <ul>
-                        <li>로컬 실시간 자막</li>
-                        <li>TXT 다운로드</li>
-                        <li>자료 정리 3회</li>
-                        <li>클라우드 10분</li>
-                    </ul>
-                </article>
-                <article class="price-card featured">
-                    <span class="price-label">Premium</span>
-                    <strong>월 9,900원</strong>
-                    <p>강의 자막과 수업자료 자동화</p>
-                    <ul>
-                        <li>API 키 없이 클라우드 고정밀 600분</li>
-                        <li>API 키 없이 강의자료/질문 300회</li>
-                        <li>SRT/VTT/PDF 내보내기</li>
-                        <li>긴 녹음 최종 변환 60회</li>
-                    </ul>
-                    <button type="button" onclick="startCheckout('premium')" class="btn btn-start">월 9,900원 시작</button>
-                    <button type="button" onclick="loadSampleLesson(); closePricingModal();" class="btn btn-pip">샘플 보기</button>
-                </article>
-                <article class="price-card">
-                    <span class="price-label">Pro / Education</span>
-                    <strong>월 19,900원~</strong>
-                    <p>강사·교육기관용 운영 기능</p>
-                    <ul>
-                        <li>긴 강의/세션 한도 확대</li>
-                        <li>공유 방 고급 기능</li>
-                        <li>기록 검색/폴더</li>
-                        <li>교육기관 문의 대응</li>
-                    </ul>
-                    <a class="btn btn-download" href="mailto:smarttool_lee@naver.com?subject=LiveNote%20Pro%20문의">문의하기</a>
-                </article>
-            </div>
-        </div>
-    </div>
-
-    <div id="upgrade-modal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
-        <div class="auth-dialog">
-            <div class="auth-header">
-                <div>
-                    <h3 id="upgrade-modal-title">무료 한도에 도달했습니다</h3>
-                    <p id="upgrade-modal-reason">Premium으로 계속 사용할 수 있습니다.</p>
-                </div>
-                <button type="button" onclick="closeUpgradeModal()" class="btn btn-pip">닫기</button>
-            </div>
-            <div class="upgrade-body">
-                <div id="upgrade-usage" class="upgrade-usage">클라우드 0분/10분 · AI 0/3 · 최종변환 0/1</div>
-                <div class="upgrade-points">
-                    <span>고정밀 클라우드 600분</span>
-                    <span>강의자료 300회</span>
-                    <span>SRT/VTT/PDF 저장</span>
-                </div>
-                <div class="upgrade-actions">
-                    <button type="button" onclick="continueUpgradeFlow()" class="btn btn-start">Premium 보기</button>
-                    <button type="button" onclick="closeUpgradeModal()" class="btn btn-download">나중에</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <canvas id="pip-canvas" width="800" height="200"></canvas>
-    <video id="pip-video" autoplay playsinline muted></video>
-    <div class="ad-slot mobile-bottom-ad" aria-label="모바일 하단 배너 광고 영역">
-        <ins class="adsbygoogle"
-             style="display:block"
-             data-ad-client="ca-pub-5553376072633585"
-             data-ad-slot=""
-             data-ad-format="horizontal"
-             data-full-width-responsive="true"></ins>
-    </div>
-
-    <!-- Supabase Library -->
+    <!-- 스크립트 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="app.js"></script>
+
+    <!-- 플로팅 라인 배경 엔진 (ES Module - Full Original Version) -->
+    <script type="module">
+        import {
+          Clock, Mesh, OrthographicCamera, PlaneGeometry,
+          Scene, ShaderMaterial, Vector2, Vector3, WebGLRenderer
+        } from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+        // ===== CONFIG =====
+        const CONFIG = {
+          linesGradient: ['#ff00ff', '#4B0082', '#00ffff'],
+          enabledWaves: ['top', 'middle', 'bottom'],
+          lineCount: [6, 6, 6],
+          lineDistance: [5, 5, 5],
+          topWavePosition:    { x: 10.0, y:  0.5, rotate: -0.4 },
+          middleWavePosition: { x:  5.0, y:  0.0, rotate:  0.2 },
+          bottomWavePosition: { x:  2.0, y: -0.7, rotate: -1.0 },
+          animationSpeed: 1,
+          interactive: true,
+          bendRadius: 5.0,
+          bendStrength: -0.5,
+          mouseDamping: 0.05,
+          parallax: true,
+          parallaxStrength: 0.2,
+        };
+
+        const MAX_GRADIENT_STOPS = 8;
+        function hexToVec3(hex) {
+          let v = hex.trim().replace('#','');
+          let r=255, g=255, b=255;
+          if (v.length===3) { r=parseInt(v[0]+v[0],16); g=parseInt(v[1]+v[1],16); b=parseInt(v[2]+v[2],16);
+          } else if (v.length===6) { r=parseInt(v.slice(0,2),16); g=parseInt(v.slice(2,4),16); b=parseInt(v.slice(4,6),16); }
+          return new Vector3(r/255, g/255, b/255);
+        }
+
+        const getLineCount = (waveType) => {
+          if (!CONFIG.enabledWaves.includes(waveType)) return 0;
+          const i = CONFIG.enabledWaves.indexOf(waveType);
+          return Array.isArray(CONFIG.lineCount) ? (CONFIG.lineCount[i] ?? 6) : CONFIG.lineCount;
+        };
+
+        const getLineDistance = (waveType) => {
+          if (!CONFIG.enabledWaves.includes(waveType)) return 0.01;
+          const i = CONFIG.enabledWaves.indexOf(waveType);
+          const d = Array.isArray(CONFIG.lineDistance) ? (CONFIG.lineDistance[i] ?? 5) : CONFIG.lineDistance;
+          return d * 0.01;
+        };
+
+        const vertexShader = `precision highp float; void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+        const fragmentShader = `
+        precision highp float;
+        uniform float iTime; uniform vec3 iResolution; uniform float animationSpeed;
+        uniform bool enableTop; uniform bool enableMiddle; uniform bool enableBottom;
+        uniform int topLineCount; uniform int middleLineCount; uniform int bottomLineCount;
+        uniform float topLineDistance; uniform float middleLineDistance; uniform float bottomLineDistance;
+        uniform vec3 topWavePosition; uniform vec3 middleWavePosition; uniform vec3 bottomWavePosition;
+        uniform vec2 iMouse; uniform bool interactive; uniform float bendRadius; uniform float bendStrength; uniform float bendInfluence;
+        uniform bool parallax; uniform float parallaxStrength; uniform vec2 parallaxOffset;
+        uniform vec3 lineGradient[8]; uniform int lineGradientCount;
+
+        const vec3 BLACK = vec3(0.0);
+        const vec3 PINK = vec3(233.0, 71.0, 245.0) / 255.0;
+        const vec3 BLUE = vec3(47.0, 75.0, 162.0) / 255.0;
+
+        mat2 rotate(float r) { return mat2(cos(r), sin(r), -sin(r), cos(r)); }
+        vec3 background_color(vec2 uv) {
+          vec3 col = vec3(0.0);
+          float y = sin(uv.x - 0.2) * 0.3 - 0.1;
+          float m = uv.y - y;
+          col += mix(BLUE, BLACK, smoothstep(0.0, 1.0, abs(m)));
+          col += mix(PINK, BLACK, smoothstep(0.0, 1.0, abs(m - 0.8)));
+          return col * 0.5;
+        }
+        vec3 getLineColor(float t, vec3 baseColor) {
+          if (lineGradientCount <= 0) return baseColor;
+          float clampedT = clamp(t, 0.0, 0.9999);
+          float scaled = clampedT * float(lineGradientCount - 1);
+          int idx = int(floor(scaled));
+          return mix(lineGradient[idx], lineGradient[min(idx + 1, lineGradientCount - 1)], fract(scaled)) * 0.5;
+        }
+        float wave(vec2 uv, float offset, vec2 screenUv, vec2 mouseUv, bool shouldBend) {
+          float time = iTime * animationSpeed;
+          float y = sin(uv.x + offset + time * 0.1) * (sin(offset + time * 0.2) * 0.3);
+          if (shouldBend) {
+            float influence = exp(-dot(screenUv - mouseUv, screenUv - mouseUv) * bendRadius);
+            y += (mouseUv.y - screenUv.y) * influence * bendStrength * bendInfluence;
+          }
+          return 0.0175 / max(abs(uv.y - y) + 0.01, 1e-3) + 0.01;
+        }
+        void main() {
+          vec2 fragCoord = gl_FragCoord.xy;
+          vec2 baseUv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
+          baseUv.y *= -1.0;
+          if (parallax) baseUv += parallaxOffset;
+          vec3 col = vec3(0.0);
+          vec3 b = lineGradientCount > 0 ? vec3(0.0) : background_color(baseUv);
+          vec2 mouseUv = interactive ? (2.0 * iMouse - iResolution.xy) / iResolution.y : vec2(0.0);
+          if (interactive) mouseUv.y *= -1.0;
+          if (enableBottom) {
+            for (int i = 0; i < 16; ++i) { if (i >= bottomLineCount) break;
+              float fi = float(i);
+              vec2 ruv = baseUv * rotate(bottomWavePosition.z * log(length(baseUv) + 1.0));
+              col += getLineColor(fi/max(float(bottomLineCount-1),1.0), b) * wave(ruv + vec2(bottomLineDistance * fi + bottomWavePosition.x, bottomWavePosition.y), 1.5 + 0.2 * fi, baseUv, mouseUv, interactive) * 0.2;
+            }
+          }
+          if (enableMiddle) {
+            for (int i = 0; i < 16; ++i) { if (i >= middleLineCount) break;
+              float fi = float(i);
+              vec2 ruv = baseUv * rotate(middleWavePosition.z * log(length(baseUv) + 1.0));
+              col += getLineColor(fi/max(float(middleLineCount-1),1.0), b) * wave(ruv + vec2(middleLineDistance * fi + middleWavePosition.x, middleWavePosition.y), 2.0 + 0.15 * fi, baseUv, mouseUv, interactive);
+            }
+          }
+          if (enableTop) {
+            for (int i = 0; i < 16; ++i) { if (i >= topLineCount) break;
+              float fi = float(i);
+              vec2 ruv = baseUv * rotate(topWavePosition.z * log(length(baseUv) + 1.0));
+              ruv.x *= -1.0;
+              col += getLineColor(fi/max(float(topLineCount-1),1.0), b) * wave(ruv + vec2(topLineDistance * fi + topWavePosition.x, topWavePosition.y), 1.0 + 0.2 * fi, baseUv, mouseUv, interactive) * 0.1;
+            }
+          }
+          gl_FragColor = vec4(col, 1.0);
+        }
+        `;
+
+        const container = document.getElementById('floating-lines-container');
+        const scene = new Scene();
+        const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const renderer = new WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+        container.appendChild(renderer.domElement);
+
+        const uniforms = {
+          iTime: { value: 0 }, iResolution: { value: new Vector3(1, 1, 1) }, animationSpeed: { value: CONFIG.animationSpeed },
+          enableTop: { value: CONFIG.enabledWaves.includes('top') }, enableMiddle: { value: CONFIG.enabledWaves.includes('middle') }, enableBottom: { value: CONFIG.enabledWaves.includes('bottom') },
+          topLineCount: { value: Math.min(getLineCount('top'), 8) }, middleLineCount: { value: Math.min(getLineCount('middle'), 8) }, bottomLineCount: { value: Math.min(getLineCount('bottom'), 8) },
+          topLineDistance: { value: getLineDistance('top') }, middleLineDistance: { value: getLineDistance('middle') }, bottomLineDistance: { value: getLineDistance('bottom') },
+          topWavePosition: { value: new Vector3(CONFIG.topWavePosition.x, CONFIG.topWavePosition.y, CONFIG.topWavePosition.rotate) },
+          middleWavePosition: { value: new Vector3(CONFIG.middleWavePosition.x, CONFIG.middleWavePosition.y, CONFIG.middleWavePosition.rotate) },
+          bottomWavePosition: { value: new Vector3(CONFIG.bottomWavePosition.x, CONFIG.bottomWavePosition.y, CONFIG.bottomWavePosition.rotate) },
+          iMouse: { value: new Vector2(-1000, -1000) }, interactive: { value: CONFIG.interactive }, bendRadius: { value: CONFIG.bendRadius },
+          bendStrength: { value: CONFIG.bendStrength }, bendInfluence: { value: 0 }, parallax: { value: CONFIG.parallax },
+          parallaxStrength: { value: CONFIG.parallaxStrength }, parallaxOffset: { value: new Vector2(0, 0) },
+          lineGradient: { value: Array.from({ length: MAX_GRADIENT_STOPS }, () => new Vector3(1,1,1)) }, lineGradientCount: { value: 0 }
+        };
+
+        if (CONFIG.linesGradient) {
+          uniforms.lineGradientCount.value = CONFIG.linesGradient.length;
+          CONFIG.linesGradient.forEach((hex, i) => { uniforms.lineGradient.value[i].copy(hexToVec3(hex)); });
+        }
+
+        scene.add(new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({ uniforms, vertexShader, fragmentShader })));
+        const clock = new Clock();
+        const targetMouse = new Vector2(-1000, -1000), currentMouse = new Vector2(-1000, -1000);
+        const targetParallax = new Vector2(0, 0), currentParallax = new Vector2(0, 0);
+        let targetInfluence = 0, currentInfluence = 0;
+
+        function setSize() {
+          const w = container.clientWidth || 1, h = container.clientHeight || 1;
+          renderer.setSize(w, h, false);
+          uniforms.iResolution.value.set(renderer.domElement.width, renderer.domElement.height, 1);
+        }
+        window.addEventListener('resize', setSize); setSize();
+
+        window.addEventListener('pointermove', e => {
+          targetMouse.set(e.clientX * renderer.getPixelRatio(), (window.innerHeight - e.clientY) * renderer.getPixelRatio());
+          targetInfluence = 1.0;
+          targetParallax.set(((e.clientX - window.innerWidth/2) / window.innerWidth) * CONFIG.parallaxStrength, -((e.clientY - window.innerHeight/2) / window.innerHeight) * CONFIG.parallaxStrength);
+        });
+
+        let lastFrameTime = 0;
+        const fpsLimit = 30;
+
+        function renderLoop(time) {
+          requestAnimationFrame(renderLoop);
+          
+          if (time - lastFrameTime < 1000 / fpsLimit) return;
+          lastFrameTime = time;
+
+          uniforms.iTime.value = clock.getElapsedTime();
+          currentMouse.lerp(targetMouse, CONFIG.mouseDamping); uniforms.iMouse.value.copy(currentMouse);
+          currentInfluence += (targetInfluence - currentInfluence) * CONFIG.mouseDamping; uniforms.bendInfluence.value = currentInfluence;
+          currentParallax.lerp(targetParallax, CONFIG.mouseDamping); uniforms.parallaxOffset.value.copy(currentParallax);
+          renderer.render(scene, camera);
+        }
+        requestAnimationFrame(renderLoop);
+    </script>
 </body>
 </html>
