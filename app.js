@@ -2645,21 +2645,31 @@ async function initAudio() {
         if(stream) stream.getTracks().forEach(track => track.stop());
         
         try {
-            stream = await navigator.mediaDevices.getUserMedia(getConstraints(deviceId));
+            // 1차 시도: 저장된 특정 장치 요청
+            const constraints = getConstraints(deviceId);
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (e) {
-            // 특정 장치로 실패하면 기본 마이크로 재시도
-            if (deviceId) {
-                deviceId = "";
-                localStorage.removeItem('vlive_audio_device');
-                stream = await navigator.mediaDevices.getUserMedia(getConstraints(""));
-            } else {
-                throw e;
+            console.warn("특정 마이크 요청 실패, 기본 장치로 재시도:", e);
+            // 2차 시도: 저장된 ID 삭제 후 기본 장치 요청
+            deviceId = "";
+            localStorage.removeItem('vlive_audio_device');
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (e2) {
+                throw e2; // 둘 다 실패하면 최종 에러 처리로 이동
             }
         }
 
-        // 성공 시 목록 갱신 및 저장
-        localStorage.setItem('vlive_audio_device', deviceId);
+        // 성공 시 목록 갱신 및 실제 잡힌 장치 ID 저장
+        const activeTrack = stream.getAudioTracks()[0];
+        const activeSettings = activeTrack ? activeTrack.getSettings() : {};
+        const actualDeviceId = activeSettings.deviceId || deviceId;
+        
+        if (actualDeviceId) localStorage.setItem('vlive_audio_device', actualDeviceId);
         await refreshDevices();
+        
+        // 목록에서 실제 선택된 장치와 동기화
+        if (deviceSelect && actualDeviceId) deviceSelect.value = actualDeviceId;
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
