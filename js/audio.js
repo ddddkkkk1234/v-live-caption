@@ -104,7 +104,13 @@ async function startLocalWhisper(lang) {
     document.getElementById('model-loading').style.display = 'block';
     try {
         document.getElementById('model-loading-fill').style.width = "0%";
-        if (location.protocol !== "file:") getWhisperWorker();
+        if (location.protocol !== "file:") {
+            try {
+                getWhisperWorker();
+            } catch (workerErr) {
+                log("[로컬 자막] " + workerErr.message, true);
+            }
+        }
         else log("[로컬 자막] file:// 실행 감지: 호환 모드로 실행합니다.", true);
 
         const captureLocalChunk = async () => {
@@ -120,7 +126,7 @@ async function startLocalWhisper(lang) {
                 const audioFloat32 = decoded.getChannelData(0);
                 const rms = getAudioRms(audioFloat32);
                 console.log("Audio RMS:", rms, "Threshold:", LOCAL_MIN_RMS);
-                if (rms < LOCAL_MIN_RMS || rms < 0.005) {
+                if (rms < LOCAL_MIN_RMS || rms < 0.002) {
                     logLowSignalOnce();
                     return;
                 }
@@ -237,21 +243,6 @@ function stopProRec() {
     const modelLoading = document.getElementById('model-loading');
     if (modelLoading) modelLoading.style.display = 'none';
     showToast(getAppLanguage() === 'ko' ? "세션을 종료했습니다." : "Session ended.");
-
-
-    let cleaned = text.trim();
-    if(!cleaned) return "";
-    cleaned = cleaned.replace(/^\[(끝|end)\]$/i, "$1");
-    if (isLikelyWhisperHallucination(cleaned)) return "";
-    const words = cleaned.split(/\s+/);
-    const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
-    cleaned = dedupedWords.join(' ');
-    const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
-    if(noise.some(n => cleaned.toLowerCase() === n)) return "";
-    if (isLikelyWhisperHallucination(cleaned)) return "";
-    if(cleaned === lastLoggedText) return ""; 
-    lastLoggedText = cleaned;
-    return cleaned;
 }
 
 function cleanText(text) {
@@ -1122,11 +1113,6 @@ async function translateCaptionChunk(text) {
         return translated;
     } catch (e) {
         log('번역 자막 연결 오류: 로컬 파일로 열었다면 서버 주소에서 실행해 주세요.', true);
-        return source;
-    } finally {
-        if (typeof translationInFlight !== 'undefined') translationInFlight = false;
-    }
-}�다면 서버 주소에서 실행해 주세요.', true);
         return source;
     } finally {
         if (typeof translationInFlight !== 'undefined') translationInFlight = false;
