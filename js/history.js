@@ -320,4 +320,19 @@ function loadSampleLesson() {
     }
     saveHistorySnapshot(transcriptText);
     showToast("샘플 강의와 자료를 불러왔습니다.");
+}function saveCaptionSegments() {
+    localStorage.setItem(CAPTION_SEGMENTS_KEY, JSON.stringify(captionSegments.slice(-500)));
 }
+
+function addCaptionSegment(text, durationMs = 4000) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+    if (!sessionCaptionStartedAt) startCaptionTimingSession();
+    const elapsedEnd = Math.max(0, (Date.now() - sessionCaptionStartedAt) / 1000);
+    const duration = Math.max(0.5, (Number(durationMs) || 4000) / 1000);
+    const previousEnd = captionSegments.length ? captionSegments[captionSegments.length - 1].end : 0;
+    const start = Math.max(previousEnd, elapsedEnd - duration);
+    const end = Math.max(start + 0.5, elapsedEnd);
+    captionSegments.push({ text: cleaned, start, end });
+    captionSegments = captionSegments.slice(-500);
+    saveCaptionSegments();

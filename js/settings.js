@@ -314,4 +314,52 @@ function restoreLessonMeta() {
 
 function saveLessonMeta() {
     localStorage.setItem(LESSON_META_KEY, JSON.stringify(getLessonMeta()));
+}function getRecognitionLanguage() {
+    const value = document.getElementById('lang-select')?.value || 'en';
+    return value === 'en-AU' ? 'en' : value;
 }
+
+function getRecognitionLanguageForServer() {
+    return document.getElementById('lang-select')?.value || 'en';
+}
+
+function restoreApiSettings() {
+function getSttRequestSettings() {
+    const usePersonalKey = document.getElementById('personal-api-enabled')?.checked;
+    if (!usePersonalKey) return { provider: 'default' };
+    saveApiSettings();
+    return {
+        provider: document.getElementById('stt-provider')?.value || 'groq',
+        model: document.getElementById('stt-model')?.value || '',
+        apiKey: document.getElementById('stt-api-key')?.value.trim() || '',
+        providerExtra: document.getElementById('stt-provider-extra')?.value.trim() || '',
+        diarization: Boolean(document.getElementById('stt-diarization-enabled')?.checked)
+    };
+}
+
+function getCloudRecordingOptions(provider) {
+    if (provider === 'azure' && MediaRecorder.isTypeSupported?.('audio/ogg;codecs=opus')) {
+        return { mimeType: 'audio/ogg;codecs=opus' };
+    }
+    if (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) {
+        return { mimeType: 'audio/webm;codecs=opus' };
+    }
+    return {};
+}
+
+function getAiRequestSettings() {
+    const enabled = document.getElementById('ai-personal-api-enabled')?.checked;
+    if (!enabled) return { provider: 'default' };
+    saveAiSettings();
+    return {
+        provider: document.getElementById('ai-provider')?.value || 'gemini',
+        model: document.getElementById('ai-model')?.value || '',
+        apiKey: document.getElementById('ai-api-key')?.value.trim() || ''
+    };
+}
+
+function getMinutesType() {
+    return document.getElementById('minutes-type')?.value || 'lecture';
+}
+
+async function translateCaptionChunk(text) {

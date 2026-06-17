@@ -537,4 +537,35 @@ function stopProRec() {
     const modelLoading = document.getElementById('model-loading');
     if (modelLoading) modelLoading.style.display = 'none';
     showToast(getAppLanguage() === 'ko' ? "ì„¸ì…˜ì„ ì¢…ë£Œí–ˆìŠµë‹ˆë‹¤." : "Session ended.");
+}async function prepareCaptionText(text) {
+    return cleanText(await translateCaptionChunk(text));
+}
+
+async function requestStt(formData) {
+    if (location.protocol === "file:") {
+        throw new Error("?´ë¼?°ë“œ ?ë§‰?€ file://?ì„œ ?¬ìš©?????†ìŠµ?ˆë‹¤. ?œë²„ ì£¼ì†Œë¡??´ì–´ ì£¼ì„¸??");
+    }
+    const headers = currentSession?.access_token
+        ? { Authorization: `Bearer ${currentSession.access_token}` }
+        : {};
+    const res = await fetch('/api/stt', { method: 'POST', body: formData, headers });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        throw new Error("/api/stt ?œë²„ ?¨ìˆ˜ê°€ ?¤í–‰ ì¤‘ì´ ?„ë‹™?ˆë‹¤. Cloudflare Pages/Functions ?ëŠ” ë°°í¬ ì£¼ì†Œ?ì„œ ?´ì–´ ì£¼ì„¸??");
+    }
+    const data = await res.json();
+    if (!res.ok) {
+        const error = new Error(data.error || "?´ë¼?°ë“œ ?ë§‰ ?”ì²­ ?¤íŒ¨");
+        error.status = res.status;
+        throw error;
+    }
+    return data;
+}
+
+function getCloudRetryDelayMs(error) {
+    const message = String(error?.message || "");
+    const retryMatch = message.match(/(\d+(?:\.\d+)?)\s*ì´?s*??);
+    if (retryMatch) return Math.ceil(Number(retryMatch[1]) * 1000) + 800;
+    if (error?.status === 429 || message.includes("rate") || message.includes("?”ì²­ ?ë„ ?œí•œ")) return 4500;
+    return 0;
 }
