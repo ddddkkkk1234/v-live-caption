@@ -363,3 +363,67 @@ function getMinutesType() {
 }
 
 async function translateCaptionChunk(text) {
+    const target = document.getElementById('translation-target')?.value || 'none';
+    if (target === 'none' || !text) return text;
+    if (location.protocol === 'file:') {
+        log('번역은 서버 주소에서 실행해야 사용할 수 있습니다. 원문 자막만 표시합니다.', true);
+        return text;
+    }
+    const source = cleanText(text);
+    if (source.length < 2) return source;
+    const cacheKey = `${target}:${source}`;
+    if (translationCache.has(cacheKey)) return translationCache.get(cacheKey);
+    const now = Date.now();
+    if (translationInFlight || now - lastTranslationAt < TRANSLATION_MIN_INTERVAL_MS) {
+        log('번역 자막 요청 간격 제한: 원문만 우선 표시합니다.', true);
+        return source;
+    }
+    const aiSettings = getAiRequestSettings();
+    if (aiSettings.provider !== 'default' && !aiSettings.apiKey) { 
+        log('번역 자막에는 내 AI API 키를 입력하거나 내 API 키 사용을 꺼주세요.', true);
+        return source;
+    }
+    const usesServerCredit = aiSettings.provider === 'default';
+    if (usesServerCredit && !currentUser) {
+        openAuthModal('번역 자막은 로그인 후 사용할 수 있습니다.');
+        return source;
+    }
+    if (usesServerCredit && !hasQuota('aiRequests', 1)) {
+        showUpgradePrompt('무료 AI 번역 횟수를 모두 사용했습니다.');
+        return source;
+    }
+    try {
+        translationInFlight = true;
+        lastTranslationAt = now;
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+            },
+            body: JSON.stringify({
+                text: source,
+                mode: 'translate',
+                targetLanguage: target,
+                provider: aiSettings.provider,
+                model: aiSettings.model,
+                apiKey: aiSettings.apiKey
+            })
+        });
+        const data = await res.json();
+        if (usesServerCredit && res.ok) incrementUsage('aiRequests', 1);
+        if (!res.ok || !data.result) {
+            log(data.result || '번역 자막 요청 실패', true);
+            return source;
+        }
+        const translated = data.result.trim();
+        translationCache.set(cacheKey, translated);
+        if (translationCache.size > 30) translationCache.delete(translationCache.keys().next().value);
+        return translated;
+    } catch (e) {
+        log('번역 자막 연결 오류: 로컬 파일로 열었다면 서버 주소에서 실행해 주세요.', true);
+        return source;
+    } finally {
+        translationInFlight = false;
+    }
+}

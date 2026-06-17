@@ -356,87 +356,7 @@ document.addEventListener('fullscreenchange', () => {
         const btn = document.getElementById('stage-mode-btn');
         if (btn) btn.textContent = uiText('stageMode');
     }
-});async function translateCaptionChunk(text) {
-    const target = document.getElementById('translation-target')?.value || 'none';
-    if (target === 'none' || !text) return text;
-    if (location.protocol === "file:") {
-        log("ë²ˆì—­?€ ?œë²„ ì£¼ì†Œ?ì„œ ?¤í–‰?????¬ìš©?????ˆìŠµ?ˆë‹¤. ?ë¬¸ ?ë§‰???œì‹œ?©ë‹ˆ??", true);
-        return text;
-    }
-    const source = cleanText(text);
-    if (source.length < 2) return source;
-    const cacheKey = `${target}:${source}`;
-    if (translationCache.has(cacheKey)) return translationCache.get(cacheKey);
-    const now = Date.now();
-    if (translationInFlight || now - lastTranslationAt < TRANSLATION_MIN_INTERVAL_MS) {
-        log("ë²ˆì—­ ?ë§‰ ?”ì²­ ê°„ê²© ?œí•œ: ?ë¬¸???°ì„  ?œì‹œ?©ë‹ˆ??", true);
-        return source;
-    }
-    const aiSettings = getAiRequestSettings();
-    if (aiSettings.provider !== 'default' && !aiSettings.apiKey) {
-        log("ë²ˆì—­ ?ë§‰?ëŠ” ??AI API ?¤ë? ?…ë ¥?˜ê±°????API ???¬ìš©??êº¼ì£¼?¸ìš”.", true);
-        return source;
-    }
-    const usesServerCredit = aiSettings.provider === 'default';
-    if (usesServerCredit && !currentUser) {
-        openAuthModal("ë²ˆì—­ ?ë§‰?€ ë¡œê·¸?????¬ìš©?????ˆìŠµ?ˆë‹¤.");
-        return source;
-    }
-    if (usesServerCredit && !hasQuota('aiRequests', 1)) {
-        showUpgradePrompt("ë¬´ë£Œ AI ë²ˆì—­ ?Ÿìˆ˜ë¥?ëª¨ë‘ ?¬ìš©?ˆìŠµ?ˆë‹¤.");
-        return source;
-    }
-    try {
-        translationInFlight = true;
-        lastTranslationAt = now;
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
-            },
-            body: JSON.stringify({
-                text: source,
-                mode: 'translate',
-                targetLanguage: target,
-                provider: aiSettings.provider,
-                model: aiSettings.model,
-                apiKey: aiSettings.apiKey
-            })
-        });
-        const data = await res.json();
-        if (usesServerCredit && res.ok) incrementUsage('aiRequests', 1);
-        if (!res.ok || !data.result) {
-            log(data.result || "ë²ˆì—­ ?ë§‰ ?”ì²­ ?¤íŒ¨", true);
-            return source;
-        }
-        const translated = data.result.trim();
-        translationCache.set(cacheKey, translated);
-        if (translationCache.size > 30) translationCache.delete(translationCache.keys().next().value);
-        return translated;
-    } catch (e) {
-        log("ë²ˆì—­ ?ë§‰ ?°ê²° ?¤ë¥˜: ë¡œì»¬ ?Œì¼ë¡??´ì—ˆ?¤ë©´ ?œë²„ ì£¼ì†Œ?ì„œ ?¤í–‰??ì£¼ì„¸??", true);
-        return source;
-    } finally {
-        translationInFlight = false;
-    }
-}
-
-function appendCaptionChunk(text, durationMs = 4000) {
-    if (!text) return;
-    if (!sessionCaptionStartedAt) startCaptionTimingSession();
-    const separator = transcriptText.trim() ? "\n" : "";
-    transcriptText = `${transcriptText.trimEnd()}${separator}${text.trim()}`;
-    localStorage.setItem('vlive_transcript', transcriptText);
-    addCaptionSegment(text, durationMs);
-    const now = Date.now();
-    if (now - lastHistorySaveAt > HISTORY_SAVE_INTERVAL_MS) {
-        lastHistorySaveAt = now;
-        saveHistorySnapshot(transcriptText);
-    }
-    renderTranscriptDisplay();
-    const scroll = document.getElementById('youtube-scroll');
-    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+});
 function renderTranscriptDisplay() {
     const el = document.getElementById('youtube-text');
     if (!el) return;
@@ -454,14 +374,21 @@ function setTranscriptText(text, options = {}) {
     renderTranscriptDisplay();
 }
 
-async function broadcastText(text) {
-    const btn = document.getElementById('shared-connect-btn');
-    const room = document.getElementById('room-id').value;
-    const role = document.getElementById('role-select').value;
+function appendCaptionChunk(text, durationMs = 4000) {
+    if (!text) return;
+    if (!sessionCaptionStartedAt) startCaptionTimingSession();
+    const separator = transcriptText.trim() ? "\n" : "";
+    transcriptText = `${transcriptText.trimEnd()}${separator}${text.trim()}`;
+    localStorage.setItem('vlive_transcript', transcriptText);
+    addCaptionSegment(text, durationMs);
+    const now = Date.now();
+    if (now - lastHistorySaveAt > HISTORY_SAVE_INTERVAL_MS) {
+        lastHistorySaveAt = now;
+        saveHistorySnapshot(transcriptText);
+    }
+    renderTranscriptDisplay();
+    const scroll = document.getElementById('youtube-scroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+    broadcastText(text);
+}
 
-    if (btn.classList.contains('btn-stop') && role === 'sender' && room && supabaseClient) {
-        await supabaseClient.channel(`room-${room}`).send({
-            type: 'broadcast',
-            event: 'caption',
-            payload: { text: text }
-        });

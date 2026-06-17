@@ -336,3 +336,5 @@ function addCaptionSegment(text, durationMs = 4000) {
     captionSegments.push({ text: cleaned, start, end });
     captionSegments = captionSegments.slice(-500);
     saveCaptionSegments();
+
+}
