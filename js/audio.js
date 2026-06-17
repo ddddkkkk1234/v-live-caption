@@ -1,4 +1,210 @@
+function recordAudioChunk(durationMs, options) {
+    return new Promise((resolve, reject) => {
+        if (!stream) {
+            reject(new Error("마이크 입력이 없습니다."));
+            return;
+        }
+        const recorder = new MediaRecorder(stream, options);
+        const chunks = [];
+        let stopTimer = null;
+        recorder.ondataavailable = e => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+        recorder.onerror = e => {
+            if (stopTimer) clearTimeout(stopTimer);
+            reject(e.error || new Error("녹음 처리 오류"));
+        };
+        recorder.onstop = () => {
+            if (stopTimer) clearTimeout(stopTimer);
+            resolve(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
+        };
+        recorder.start();
+        stopTimer = setTimeout(() => {
+            if (recorder.state === 'recording') recorder.stop();
+        }, durationMs);
+    });
 }
+
+async function startProRec() {
+    if(!stream) await initAudio();
+    if(!stream) {
+        log("마이크 권한이 필요합니다.", true);
+        showToast("마이크 권한이 필요합니다.", "error");
+        return;
+    }
+    const engine = document.getElementById('engine-select').value;
+    const localLang = getRecognitionLanguage();
+    const serverLang = getRecognitionLanguageForServer();
+    isProRunning = true;
+    isProcessingChunk = false;
+    startCaptionTimingSession();
+    
+    document.body.classList.add('recording');
+    document.getElementById('pro-start').disabled = true;
+    document.getElementById('pro-stop').disabled = false;
+    startSessionRecording();
+    setStatus(
+        engine === 'groq'
+            ? (getAppLanguage() === 'ko' ? "클라우드 자막 중" : "Cloud captions running")
+            : (getAppLanguage() === 'ko' ? "자막 생성 중" : "Captions running"),
+        true
+    );
+
+    if (engine === 'local-whisper') {
+        showToast("내 기기에서 자막 생성을 시작합니다.");
+        startLocalWhisper(localLang);
+    } else {
+        const sttSettings = getSttRequestSettings();
+        const apiLabel = sttSettings.provider === 'default'
+            ? "LiveNote 서버 크레딧"
+            : `내 ${sttSettings.provider.toUpperCase()} API 키`;
+        showToast(getAppLanguage() === 'ko'
+            ? `${apiLabel}로 클라우드 자막을 시작합니다.`
+            : `Starting cloud captions with ${apiLabel}.`);
+        startGroqWhisper(serverLang);
+    }
+}
+
+async function startLocalWhisper(lang) {
+    log("[로컬 자막] 백그라운드 모델 준비 중...");
+    showToast("로컬 자막 모델을 준비 중입니다.");
+    document.getElementById('model-loading').style.display = 'block';
+    try {
+        document.getElementById('model-loading-fill').style.width = "0%";
+        if (location.protocol !== "file:") getWhisperWorker();
+        else log("[로컬 자막] file:// 실행 감지: 호환 모드로 실행합니다.", true);
+
+        const captureLocalChunk = async () => {
+            if (!isProRunning) return;
+            isProcessingChunk = true;
+            let internalAudioCtx = null;
+            try {
+                const blob = await recordAudioChunk(CAPTURE_TIMING.localRecordMs);
+                if (blob.size < 2500) return;
+                const audioData = await blob.arrayBuffer();
+                internalAudioCtx = new AudioContext({ sampleRate: 16000 });
+                const decoded = await internalAudioCtx.decodeAudioData(audioData);
+                const audioFloat32 = decoded.getChannelData(0);
+                const rms = getAudioRms(audioFloat32);
+                if (rms < LOCAL_MIN_RMS) {
+                    logLowSignalOnce();
+                    return;
+                }
+
+                const text = await transcribeLocal(audioFloat32, lang);
+                document.getElementById('model-loading').style.display = 'none';
+                const cleaned = await prepareCaptionText(text);
+                if (cleaned && cleaned.length > 1) appendCaptionChunk(cleaned, CAPTURE_TIMING.localRecordMs);
+            } catch (e) {
+                log("로컬 자막 처리 실패: " + e.message, true);
+                showToast("로컬 자막 처리 중 오류가 발생했습니다.", "error");
+            } finally {
+                if (internalAudioCtx) await internalAudioCtx.close();
+                isProcessingChunk = false;
+                if (isProRunning) proInterval = setTimeout(captureLocalChunk, CAPTURE_TIMING.restartDelayMs);
+            }
+        };
+        captureLocalChunk();
+    } catch (e) {
+        log("로컬 자막 오류: " + e.message, true);
+        stopProRec();
+    }
+}
+
+function startGroqWhisper(lang) {
+    log("[클라우드 자막] API 엔진 가동");
+    showToast("클라우드 자막 요청을 준비했습니다.");
+    const captureCloudChunk = async () => {
+        if (!isProRunning) return;
+        const waitMs = cloudBackoffUntil - Date.now();
+        if (waitMs > 0) {
+            proInterval = setTimeout(captureCloudChunk, waitMs);
+            return;
+        }
+        isProcessingChunk = true;
+        const sttSettings = getSttRequestSettings();
+        try {
+            const usesServerCredit = sttSettings.provider === 'default';
+            const chunkSeconds = Math.ceil(CAPTURE_TIMING.cloudRecordMs / 1000);
+            if (usesServerCredit && !currentUser) {
+                openAuthModal("클라우드 고정밀 자막은 로그인 후 사용할 수 있습니다. 기본 접근성 자막은 로컬 모드에서 계속 사용할 수 있습니다.");
+                stopProRec();
+                return;
+            }
+            if (usesServerCredit && !hasQuota('cloudSeconds', chunkSeconds)) {
+                showUpgradePrompt("무료 클라우드 자막 시간이 모두 사용되었습니다.");
+                stopProRec();
+                return;
+            }
+            const blob = await recordAudioChunk(CAPTURE_TIMING.cloudRecordMs, getCloudRecordingOptions(sttSettings.provider));
+            if (blob.size < 2500) return;
+            const formData = new FormData();
+            formData.append('file', blob, blob.type.includes('ogg') ? 'audio.ogg' : 'audio.webm');
+            formData.append('durationSeconds', String(chunkSeconds));
+            if (lang !== 'auto') formData.append('language', lang);
+            formData.append('provider', sttSettings.provider);
+            if (sttSettings.provider !== 'default') {
+                if (!sttSettings.apiKey) {
+                    log("내 API 키를 입력하거나 내 API 키 사용을 꺼주세요.", true);
+                    showToast("내 API 키가 필요합니다.", "error");
+                    stopProRec();
+                    return;
+                }
+                formData.append('model', sttSettings.model);
+                formData.append('apiKey', sttSettings.apiKey);
+                if (sttSettings.diarization) formData.append('diarization', 'true');
+                if (['ibm', 'azure'].includes(sttSettings.provider) && !sttSettings.providerExtra) {
+                    log(`${sttSettings.provider.toUpperCase()} 추가 설정을 입력해 주세요.`, true);
+                    showToast(`${sttSettings.provider.toUpperCase()} 추가 설정이 필요합니다.`, "error");
+                    stopProRec();
+                    return;
+                }
+                if (sttSettings.providerExtra) formData.append('providerExtra', sttSettings.providerExtra);
+            }
+            const data = await requestStt(formData);
+            if (usesServerCredit) incrementUsage('cloudSeconds', chunkSeconds);
+            if (data.text) {
+                const cleaned = await prepareCaptionText(data.text);
+                if (cleaned) appendCaptionChunk(cleaned, CAPTURE_TIMING.cloudRecordMs);
+            }
+        } catch (e) {
+            log("클라우드 자막 연결 오류: " + e.message, true);
+            const retryDelay = getCloudRetryDelayMs(e);
+            if (retryDelay) {
+                cloudBackoffUntil = Date.now() + retryDelay;
+                showToast(`요청 제한에 걸려 ${Math.ceil(retryDelay / 1000)}초 후 다시 시도합니다.`, "error", 5200);
+            } else {
+                showToast(e.message || "클라우드 자막 연결 오류가 발생했습니다.", "error", 5200);
+            }
+        } finally {
+            isProcessingChunk = false;
+            if (isProRunning) proInterval = setTimeout(captureCloudChunk, CAPTURE_TIMING.restartDelayMs);
+        }
+    };
+    captureCloudChunk();
+}
+
+function stopProRec() { 
+    isProRunning = false; isProcessingChunk = false; clearTimeout(proInterval);
+    proInterval = null;
+    stopSessionRecording();
+    whisperRequests.forEach(({ reject }) => reject(new Error("세션이 종료되었습니다.")));
+    whisperRequests.clear();
+    if (transcriptText.trim().length >= 10) saveHistorySnapshot(transcriptText);
+    
+    document.body.classList.remove('recording');
+    const startBtn = document.getElementById('pro-start');
+    const stopBtn = document.getElementById('pro-stop');
+    if (startBtn) startBtn.disabled = false; 
+    if (stopBtn) stopBtn.disabled = true;
+    const interimText = document.getElementById('interim-text');
+    if (interimText) interimText.innerText = ""; 
+    setStatus(getAppLanguage() === 'ko' ? "대기 중" : "Idle", false);
+    const modelLoading = document.getElementById('model-loading');
+    if (modelLoading) modelLoading.style.display = 'none';
+    showToast(getAppLanguage() === 'ko' ? "세션을 종료했습니다." : "Session ended.");
+}
+
 
 async function prepareCaptionText(text) {
     return cleanText(await translateCaptionChunk(text));
@@ -486,4 +692,3 @@ function getCloudRetryDelayMs(error) {
     if (error?.status === 429 || message.includes("rate") || message.includes("요청 속도 제한")) return 4500;
     return 0;
 }
-
