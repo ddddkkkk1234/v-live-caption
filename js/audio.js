@@ -203,7 +203,346 @@ function stopProRec() {
     const modelLoading = document.getElementById('model-loading');
     if (modelLoading) modelLoading.style.display = 'none';
     showToast(getAppLanguage() === 'ko' ? "세션을 종료했습니다." : "Session ended.");
+
+
+    let cleaned = text.trim();
+    if(!cleaned) return "";
+    cleaned = cleaned.replace(/^\[(끝|end)\]$/i, "$1");
+    if (isLikelyWhisperHallucination(cleaned)) return "";
+    const words = cleaned.split(/\s+/);
+    const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
+    cleaned = dedupedWords.join(' ');
+    const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
+    if(noise.some(n => cleaned.toLowerCase() === n)) return "";
+    if (isLikelyWhisperHallucination(cleaned)) return "";
+    if(cleaned === lastLoggedText) return ""; 
+    lastLoggedText = cleaned;
+    return cleaned;
 }
+
+function cleanText(text) {
+    let cleaned = text.trim();
+    if(!cleaned) return "";
+    cleaned = cleaned.replace(/^\[(끝|end)\]$/i, "$1");
+    if (isLikelyWhisperHallucination(cleaned)) return "";
+    const words = cleaned.split(/\s+/);
+    const dedupedWords = words.filter((word, i) => word !== words[i - 1]);
+    cleaned = dedupedWords.join(' ');
+    const noise = ["감사합니다", "thank you", "어..", "음..", "어...", "감사합니다.", "Thank you.", "음", "아"];
+    if(noise.some(n => cleaned.toLowerCase() === n)) return "";
+    if (isLikelyWhisperHallucination(cleaned)) return "";
+    if(cleaned === lastLoggedText) return "";
+    lastLoggedText = cleaned;
+    return cleaned;
+}
+
+function normalizeCaptionToken(token) {
+    return token.toLowerCase().replace(/[.,!?()[\]{}"'“”‘’…~·:;，。！？]/g, "").trim();
+}
+
+function isLikelyWhisperHallucination(text) {
+    const compact = text.replace(/\s+/g, "");
+    if (/^\[?(끝|end)\]?$/i.test(compact)) return true;
+
+    const tokens = text.split(/\s+/).map(normalizeCaptionToken).filter(Boolean);
+    if (tokens.length < 6) return false;
+
+    const counts = tokens.reduce((map, token) => {
+        map.set(token, (map.get(token) || 0) + 1);
+        return map;
+    }, new Map());
+    const maxRepeat = Math.max(...counts.values());
+    const uniqueRatio = counts.size / tokens.length;
+    if (maxRepeat >= 6 && uniqueRatio <= 0.45) return true;
+
+    const subscribeMentions = tokens.filter(token => token.includes("구독") || token.includes("좋아요")).length;
+    if (subscribeMentions >= 6 && uniqueRatio <= 0.6) return true;
+
+    const pairs = [];
+    for (let i = 0; i < tokens.length - 1; i++) pairs.push(`${tokens[i]} ${tokens[i + 1]}`);
+    const pairCounts = pairs.reduce((map, pair) => {
+        map.set(pair, (map.get(pair) || 0) + 1);
+        return map;
+    }, new Map());
+    return pairCounts.size > 0 && Math.max(...pairCounts.values()) >= 4;
+}
+
+function getAudioRms(samples) {
+    if (!samples || !samples.length) return 0;
+    const stride = Math.max(1, Math.floor(samples.length / 400)); // 샘플링 수 줄임
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < samples.length; i += stride) {
+        sum += samples[i] * samples[i];
+        count++;
+    }
+    return Math.sqrt(sum / Math.max(1, count));
+}
+
+function logLowSignalOnce() {
+    const now = Date.now();
+    if (now - lastLowSignalLogAt < 12000) return;
+    lastLowSignalLogAt = now;
+    log("입력 소리가 너무 작아 자막 생성을 건너뜁니다. 마이크 입력 장치를 확인하세요.", true);
+}
+
+function getWhisperWorker() {
+    if (location.protocol === "file:") {
+        throw new Error("로컬 파일에서는 Web Worker 대신 기본 로컬 모드로 실행합니다.");
+    }
+    if (whisperWorker) return whisperWorker;
+    whisperWorker = new Worker('local-whisper-worker.js', { type: 'module' });
+    whisperWorker.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.type === 'progress') {
+            const fill = document.getElementById('model-loading-fill');
+            if (fill && data.progress?.status === 'progress') fill.style.width = `${data.progress.progress || 0}%`;
+            return;
+        }
+        if (data.type === 'log') {
+            log(data.message, true);
+            return;
+        }
+        const request = whisperRequests.get(data.id);
+        if (!request) return;
+        whisperRequests.delete(data.id);
+        if (data.type === 'result') {
+            whisperModelId = data.modelId || whisperModelId;
+            request.resolve(data.text || "");
+        } else if (data.type === 'error') {
+            request.reject(new Error(data.message || "로컬 자막 처리 실패"));
+        }
+    };
+    whisperWorker.onerror = (event) => {
+        const message = event.message || "로컬 자막 작업자 오류";
+        whisperRequests.forEach(({ reject }) => reject(new Error(message)));
+        whisperRequests.clear();
+        whisperWorker?.terminate?.();
+        whisperWorker = null;
+        log("로컬 자막 작업자 오류: file://로 열었다면 로컬 서버 주소에서 실행해 주세요.", true);
+    };
+    return whisperWorker;
+}
+
+async function loadFallbackWhisperPipeline(modelId) {
+    if (!fallbackWhisperPipeline) {
+        const module = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        module.env.allowLocalModels = false;
+        module.env.useBrowserCache = true;
+        fallbackWhisperPipeline = module.pipeline;
+    }
+    const progress = (p) => {
+        const fill = document.getElementById('model-loading-fill');
+        if (fill && p.status === 'progress') fill.style.width = `${p.progress || 0}%`;
+    };
+    try {
+        return await fallbackWhisperPipeline('automatic-speech-recognition', modelId, {
+            device: 'webgpu',
+            progress_callback: progress
+        });
+    } catch (e) {
+        return await fallbackWhisperPipeline('automatic-speech-recognition', modelId, {
+            progress_callback: progress
+        });
+    }
+}
+
+async function transcribeLocalFallback(audioFloat32, lang) {
+    if (!fallbackWhisperInstance || fallbackWhisperModelId !== LOCAL_WHISPER_MODEL) {
+        try {
+            fallbackWhisperInstance = await loadFallbackWhisperPipeline(LOCAL_WHISPER_MODEL);
+            fallbackWhisperModelId = LOCAL_WHISPER_MODEL;
+        } catch (e) {
+            log("빠른 모델 로드에 실패해 대체 모델로 전환합니다.", true);
+            fallbackWhisperInstance = await loadFallbackWhisperPipeline(FALLBACK_WHISPER_MODEL);
+            fallbackWhisperModelId = FALLBACK_WHISPER_MODEL;
+        }
+    }
+    const result = await fallbackWhisperInstance(audioFloat32, {
+        language: lang === 'auto' ? null : lang,
+        task: 'transcribe',
+        return_timestamps: false,
+        chunk_length_s: 30,
+        stride_length_s: 5
+    });
+    whisperModelId = fallbackWhisperModelId;
+    return result?.text || "";
+}
+
+function transcribeLocalInWorker(audioFloat32, lang) {
+    return new Promise((resolve, reject) => {
+        const worker = getWhisperWorker();
+        const id = ++whisperRequestId;
+        const audioCopy = new Float32Array(audioFloat32);
+        whisperRequests.set(id, { resolve, reject });
+        worker.postMessage({
+            id,
+            type: 'transcribe',
+            audio: audioCopy.buffer,
+            modelId: LOCAL_WHISPER_MODEL,
+            fallbackModelId: FALLBACK_WHISPER_MODEL,
+            lang
+        }, [audioCopy.buffer]);
+    });
+}
+
+async function transcribeLocal(audioFloat32, lang) {
+    if (location.protocol === "file:") {
+        return transcribeLocalFallback(audioFloat32, lang);
+    }
+    try {
+        return await transcribeLocalInWorker(audioFloat32, lang);
+    } catch (e) {
+        log("로컬 자막 작업자를 사용할 수 없어 기본 로컬 모드로 전환합니다.", true);
+        return transcribeLocalFallback(audioFloat32, lang);
+    }
+}
+
+async function handleOutputSelectChange() {
+    const outputSelect = document.getElementById('output-select');
+    if (!outputSelect) return;
+    const deviceId = outputSelect.value;
+    localStorage.setItem('vlive_audio_output', deviceId);
+    try {
+        if (pipVideo && typeof pipVideo.setSinkId === 'function') await pipVideo.setSinkId(deviceId);
+        if (audioContext && typeof audioContext.setSinkId === 'function') await audioContext.setSinkId(deviceId);
+        log(`출력 장치 변경: ${deviceId || "기본"}`);
+    } catch (e) { log("출력 변경 실패: " + e.message, true); }
+}
+
+async function handleDeviceSelectChange() {
+    const deviceSelect = document.getElementById('device-select');
+    if (!deviceSelect || !deviceSelect.value) return;
+    await initAudio();
+}
+
+async function refreshDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter(d => d.kind === 'audioinput');
+        const speakers = devices.filter(d => d.kind === 'audiooutput');
+        const deviceSelect = document.getElementById('device-select');
+        const outputSelect = document.getElementById('output-select');
+
+        if (deviceSelect) {
+            const savedId = localStorage.getItem('vlive_audio_device') || "";
+            deviceSelect.replaceChildren();
+            deviceSelect.appendChild(new Option(getAppLanguage()==='ko'?"기본 마이크":"Default Mic", ""));
+            mics.forEach((m, i) => {
+                if (!m.deviceId || m.deviceId === 'default') return;
+                const opt = new Option(m.label || `마이크 ${i+1}`, m.deviceId);
+                if (m.deviceId === savedId) opt.selected = true;
+                deviceSelect.appendChild(opt);
+            });
+            deviceSelect.appendChild(new Option(uiText('micPermission'), MIC_PERMISSION_VALUE));
+        }
+        if (outputSelect) {
+            const savedOutId = localStorage.getItem('vlive_audio_output') || "";
+            outputSelect.replaceChildren();
+            outputSelect.appendChild(new Option(getAppLanguage()==='ko'?"기본 스피커":"Default Speaker", ""));
+            speakers.forEach((s, i) => {
+                if (!s.deviceId || s.deviceId === 'default') return;
+                const opt = new Option(s.label || `스피커 ${i+1}`, s.deviceId);
+                if (s.deviceId === savedOutId) opt.selected = true;
+                outputSelect.appendChild(opt);
+            });
+        }
+    } catch (e) {}
+}
+
+async function initAudio() {
+    const deviceSelect = document.getElementById('device-select');
+    try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("HTTPS 연결 필요");
+        if (audioContext && audioContext.state !== 'closed') await audioContext.close();
+        if (!deviceSelect) return;
+
+        const savedId = localStorage.getItem('vlive_audio_device') || "";
+        const isReqPerm = deviceSelect.value === MIC_PERMISSION_VALUE;
+        let deviceId = isReqPerm ? "" : (deviceSelect.value || savedId);
+
+        if(stream) stream.getTracks().forEach(t => t.stop());
+        
+        // 최대한 유연한 권한 요청
+        try {
+            const constraints = { audio: deviceId ? { deviceId: { ideal: deviceId } } : true };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (e) {
+            console.warn("Retrying with default mic...", e);
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+
+        const actualId = stream.getAudioTracks()[0]?.getSettings()?.deviceId || "";
+        if (actualId) localStorage.setItem('vlive_audio_device', actualId);
+        await refreshDevices();
+        if (deviceSelect && actualId) deviceSelect.value = actualId;
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        
+        let lastDrawTime = 0;
+        function draw(time) {
+            if(!audioContext || audioContext.state === 'closed') return;
+            requestAnimationFrame(draw);
+            if (time - lastDrawTime < 66) return;
+            lastDrawTime = time;
+            if (isProRunning || pipActive) {
+                analyser.getByteFrequencyData(data);
+                let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
+                let avg = Math.round((sum / data.length) * 4.8); 
+                const vFill = document.getElementById('v-fill');
+                const vLabel = document.getElementById('v-label');
+                if (vFill) vFill.style.width = Math.min(100, avg) + "%";
+                if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
+                if (pipActive) updatePipCanvas();
+            }
+        }
+        requestAnimationFrame(draw);
+        setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
+        log("마이크 연결 성공");
+    } catch(e) {
+        if (deviceSelect && e.name === 'NotAllowedError') {
+            setupMicrophoneSelect("마이크 권한 필요");
+        }
+        log("마이크 연결 실패: " + e.message, true);
+        showToast("마이크 오류: " + e.message, "error");
+    }
+}
+
+function updatePipCanvas() {
+    if (!pipActive || !pipCtx) return;
+    pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
+    pipCtx.fillStyle = document.getElementById('text-color-picker').value;
+    const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
+    pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
+    const youtubeText = document.getElementById('youtube-text');
+    const fullText = (youtubeText ? youtubeText.innerText : "").trim();
+    const words = fullText.split(' ').slice(-8).join(' ');
+    pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
+}
+
+async function togglePIP() {
+    try {
+        if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+            pipActive = false;
+        } else {
+            pipActive = true;
+            updatePipCanvas();
+            if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream();
+            await pipVideo.play();
+            await pipVideo.requestPictureInPicture();
+        }
+    } catch (e) { log("PIP 에러", true); }
+}
+
+pipVideo.addEventListener('leavepictureinpicture', () => {
+    pipActive = false;
+});
 
 
 async function prepareCaptionText(text) {
@@ -532,14 +871,7 @@ function downloadSmartMinutes() {
     downloadTextFile(text, `LiveNote_강의노트_${stamp}.md`);
 }
 
-function escapeHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+
 
 function downloadSmartMinutesPdf() {
     const text = getSmartMinutesText();
