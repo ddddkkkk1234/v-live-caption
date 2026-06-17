@@ -18,6 +18,11 @@ const USAGE_KEY = 'vlive_usage_daily';
 const LESSON_META_KEY = 'vlive_lesson_meta';
 const UI_LANGUAGE_KEY = 'vlive_ui_language';
 
+// ── 전역 상태 변수 (추가) ──────────────────────────────────
+let transcriptText = "";
+let captionSegments = [];
+let sessionCaptionStartedAt = 0;
+
 const FREE_LIMITS = {
     cloudSeconds: 10 * 60,
     aiRequests: 3,
