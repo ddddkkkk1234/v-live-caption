@@ -107,6 +107,8 @@ async function initAudio() {
         try {
             const constraints = { audio: deviceId ? { deviceId: { ideal: deviceId } } : true };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
+            // 권한 획득 성공 직후 목록을 다시 불러오면 블루투스 등 상세 장치명이 나타납니다.
+            await refreshDevices();
         } catch (e) {
             console.warn("Retrying with default mic...", e);
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });

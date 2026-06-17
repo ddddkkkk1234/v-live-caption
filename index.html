@@ -303,7 +303,7 @@
                 if (typeof updateEngineSettingsVisibility === 'function') updateEngineSettingsVisibility();
                 
                 // 4. 장치 목록 및 기록 로딩
-                if (typeof setupMicrophoneSelect === 'function') await setupMicrophoneSelect();
+                if (typeof refreshDevices === 'function') await refreshDevices();
                 if (typeof renderHistory === 'function') renderHistory();
                 
                 // 5. 결제 결과 확인
