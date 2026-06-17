@@ -1,3 +1,36 @@
+let proInterval = null;
+let isProRunning = false;
+let audioContext = null;
+let stream = null;
+let isProcessingChunk = false;
+let cloudBackoffUntil = 0;
+let lastLowSignalLogAt = 0;
+
+console.log("LiveNote Audio Engine Loaded - v1.0.1");
+console.log("Current Protocol:", location.protocol);
+
+// Whisper
+let whisperWorker = null;
+let whisperRequestId = 0;
+const whisperRequests = new Map();
+let whisperModelId = '';
+let fallbackWhisperPipeline = null;
+let fallbackWhisperInstance = null;
+let fallbackWhisperModelId = '';
+
+// PIP
+let pipActive = false;
+let pipCanvas = document.getElementById('pip-canvas');
+let pipVideo = document.getElementById('pip-video');
+let pipCtx = pipCanvas ? pipCanvas.getContext('2d') : null;
+
+// Session Recording
+let sessionRecorder = null;
+let sessionRecordingChunks = [];
+let lastSessionRecording = null;
+let sessionRecordingStartedAt = 0;
+let lastSessionRecordingDurationMs = 0;
+
 function recordAudioChunk(durationMs, options) {
     return new Promise((resolve, reject) => {
         if (!stream) {
@@ -86,6 +119,7 @@ async function startLocalWhisper(lang) {
                 const decoded = await internalAudioCtx.decodeAudioData(audioData);
                 const audioFloat32 = decoded.getChannelData(0);
                 const rms = getAudioRms(audioFloat32);
+                console.log("Audio RMS:", rms, "Threshold:", LOCAL_MIN_RMS);
                 if (rms < LOCAL_MIN_RMS) {
                     logLowSignalOnce();
                     return;
@@ -291,7 +325,8 @@ function getWhisperWorker() {
         throw new Error("로컬 파일에서는 Web Worker 대신 기본 로컬 모드로 실행합니다.");
     }
     if (whisperWorker) return whisperWorker;
-    whisperWorker = new Worker('local-whisper-worker.js', { type: 'module' });
+    // 경로를 루트 기준 절대 경로로 변경하여 확실하게 호출
+    whisperWorker = new Worker('/js/workers/local-whisper-worker.js', { type: 'module' });
     whisperWorker.onmessage = (event) => {
         const data = event.data || {};
         if (data.type === 'progress') {
@@ -1023,4 +1058,72 @@ function getCloudRetryDelayMs(error) {
     if (retryMatch) return Math.ceil(Number(retryMatch[1]) * 1000) + 800;
     if (error?.status === 429 || message.includes("rate") || message.includes("요청 속도 제한")) return 4500;
     return 0;
+}
+
+async function translateCaptionChunk(text) {
+    const target = document.getElementById('translation-target')?.value || 'none';
+    if (target === 'none' || !text) return text;
+    if (location.protocol === 'file:') {
+        log('번역은 서버 주소에서 실행해야 사용할 수 있습니다. 원문 자막만 표시합니다.', true);
+        return text;
+    }
+    const source = cleanText(text);
+    if (source.length < 2) return source;
+    const cacheKey = `${target}:${source}`;
+    if (typeof translationCache !== 'undefined' && translationCache.has(cacheKey)) return translationCache.get(cacheKey);
+    const now = Date.now();
+    if (typeof translationInFlight !== 'undefined' && (translationInFlight || now - lastTranslationAt < 2500)) {
+        log('번역 자막 요청 간격 제한: 원문만 우선 표시합니다.', true);
+        return source;
+    }
+    const aiSettings = getAiRequestSettings();
+    if (aiSettings.provider !== 'default' && !aiSettings.apiKey) { 
+        log('번역 자막에는 내 AI API 키를 입력하거나 내 API 키 사용을 꺼주세요.', true);
+        return source;
+    }
+    const usesServerCredit = aiSettings.provider === 'default';
+    if (usesServerCredit && typeof currentUser !== 'undefined' && !currentUser) {
+        openAuthModal('번역 자막은 로그인 후 사용할 수 있습니다.');
+        return source;
+    }
+    if (usesServerCredit && typeof hasQuota === 'function' && !hasQuota('aiRequests', 1)) {
+        showUpgradePrompt('무료 AI 번역 횟수를 모두 사용했습니다.');
+        return source;
+    }
+    try {
+        if (typeof translationInFlight !== 'undefined') translationInFlight = true;
+        if (typeof lastTranslationAt !== 'undefined') lastTranslationAt = now;
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(typeof currentSession !== 'undefined' && currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+            },
+            body: JSON.stringify({
+                text: source,
+                mode: 'translate',
+                targetLanguage: target,
+                provider: aiSettings.provider,
+                model: aiSettings.model,
+                apiKey: aiSettings.apiKey
+            })
+        });
+        const data = await res.json();
+        if (usesServerCredit && res.ok && typeof incrementUsage === 'function') incrementUsage('aiRequests', 1);
+        if (!res.ok || !data.result) {
+            log(data.result || '번역 자막 요청 실패', true);
+            return source;
+        }
+        const translated = data.result.trim();
+        if (typeof translationCache !== 'undefined') {
+            translationCache.set(cacheKey, translated);
+            if (translationCache.size > 30) translationCache.delete(translationCache.keys().next().value);
+        }
+        return translated;
+    } catch (e) {
+        log('번역 자막 연결 오류: 로컬 파일로 열었다면 서버 주소에서 실행해 주세요.', true);
+        return source;
+    } finally {
+        if (typeof translationInFlight !== 'undefined') translationInFlight = false;
+    }
 }

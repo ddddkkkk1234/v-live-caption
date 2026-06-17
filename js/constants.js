@@ -11,7 +11,7 @@ const DISPLAY_TRANSCRIPT_LIMIT = 3000;
 const HISTORY_SAVE_INTERVAL_MS = 15000;
 const LOCAL_WHISPER_MODEL = "Xenova/whisper-tiny";
 const FALLBACK_WHISPER_MODEL = "Xenova/whisper-base";
-const LOCAL_MIN_RMS = 0.0001; // 문턱값을 0.003에서 0.0001로 대폭 하향 (거의 모든 소리 허용)
+const LOCAL_MIN_RMS = 0; // 0으로 설정하여 무음 감지 로직을 사실상 비활성화 (무조건 실행)
 const CAPTURE_TIMING = { localRecordMs: 2000, cloudRecordMs: 3500, restartDelayMs: 300 };
 const PLAN_KEY = 'vlive_plan';
 const USAGE_KEY = 'vlive_usage_daily';
@@ -22,6 +22,12 @@ const UI_LANGUAGE_KEY = 'vlive_ui_language';
 let transcriptText = "";
 let captionSegments = [];
 let sessionCaptionStartedAt = 0;
+
+// 번역 상태 변수
+let translationCache = new Map();
+let translationInFlight = false;
+let lastTranslationAt = 0;
+let lastLoggedText = ""; // 중복 로그 방지용 변수 전역 이동
 
 const FREE_LIMITS = {
     cloudSeconds: 10 * 60,
