@@ -22,6 +22,7 @@ const UI_LANGUAGE_KEY = 'vlive_ui_language';
 let transcriptText = "";
 let captionSegments = [];
 let sessionCaptionStartedAt = 0;
+let lastHistorySaveAt = 0;
 
 // 번역 상태 변수
 let translationCache = new Map();

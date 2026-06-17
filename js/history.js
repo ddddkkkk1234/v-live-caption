@@ -320,7 +320,9 @@ function loadSampleLesson() {
     }
     saveHistorySnapshot(transcriptText);
     showToast("샘플 강의와 자료를 불러왔습니다.");
-}function saveCaptionSegments() {
+}
+
+function saveCaptionSegments() {
     localStorage.setItem(CAPTION_SEGMENTS_KEY, JSON.stringify(captionSegments.slice(-500)));
 }
 

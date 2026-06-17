@@ -389,6 +389,6 @@ function appendCaptionChunk(text, durationMs = 4000) {
     renderTranscriptDisplay();
     const scroll = document.getElementById('youtube-scroll');
     if (scroll) scroll.scrollTop = scroll.scrollHeight;
-    broadcastText(text);
+    if (typeof broadcastText === 'function') broadcastText(text);
 }
 

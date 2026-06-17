@@ -120,7 +120,7 @@ async function startLocalWhisper(lang) {
                 const audioFloat32 = decoded.getChannelData(0);
                 const rms = getAudioRms(audioFloat32);
                 console.log("Audio RMS:", rms, "Threshold:", LOCAL_MIN_RMS);
-                if (rms < LOCAL_MIN_RMS) {
+                if (rms < LOCAL_MIN_RMS || rms < 0.005) {
                     logLowSignalOnce();
                     return;
                 }
@@ -1122,6 +1122,11 @@ async function translateCaptionChunk(text) {
         return translated;
     } catch (e) {
         log('번역 자막 연결 오류: 로컬 파일로 열었다면 서버 주소에서 실행해 주세요.', true);
+        return source;
+    } finally {
+        if (typeof translationInFlight !== 'undefined') translationInFlight = false;
+    }
+}�다면 서버 주소에서 실행해 주세요.', true);
         return source;
     } finally {
         if (typeof translationInFlight !== 'undefined') translationInFlight = false;
