@@ -283,5 +283,36 @@
 
     <!-- 플로팅 라인 배경 엔진 (분리됨) -->
     <script type="module" src="js/background.js"></script>
+
+    <!-- 앱 초기화 스크립트 -->
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // 1. 기초 UI 및 언어 설정
+                if (typeof initLanguageControls === 'function') initLanguageControls();
+                
+                // 2. 인증 상태 초기화 (Supabase 연결 포함)
+                if (typeof initAuthState === 'function') await initAuthState();
+                
+                // 3. 설정 복원 (API 키, 스타일 등)
+                if (typeof restoreApiSettings === 'function') restoreApiSettings();
+                if (typeof restoreAiSettings === 'function') restoreAiSettings();
+                if (typeof restoreLessonMeta === 'function') restoreLessonMeta();
+                if (typeof updateStyle === 'function') updateStyle();
+                if (typeof updateEngineSettingsVisibility === 'function') updateEngineSettingsVisibility();
+                
+                // 4. 장치 목록 및 기록 로딩
+                if (typeof setupMicrophoneSelect === 'function') await setupMicrophoneSelect();
+                if (typeof renderHistory === 'function') renderHistory();
+                
+                // 5. 결제 결과 확인
+                if (typeof handleBillingReturn === 'function') await handleBillingReturn();
+                
+                console.log("LiveNote initialized successfully.");
+            } catch (e) {
+                console.error("Initialization failed:", e);
+            }
+        });
+    </script>
 </body>
 </html>
