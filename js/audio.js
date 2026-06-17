@@ -89,6 +89,15 @@ async function initAudio() {
     const deviceSelect = document.getElementById('device-select');
     try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("HTTPS 연결 필요");
+        
+        // 이미 스트림이 있고 선택된 장치와 일치한다면 중복 초기화 방지
+        const currentDeviceId = stream?.getAudioTracks()[0]?.getSettings()?.deviceId;
+        const targetDeviceId = deviceSelect?.value;
+        if (stream && currentDeviceId === targetDeviceId && audioContext && audioContext.state !== 'closed') {
+            log("마이크가 이미 연결되어 있습니다.");
+            return;
+        }
+
         if (audioContext && audioContext.state !== 'closed') await audioContext.close();
         if (!deviceSelect) return;
         const savedId = localStorage.getItem('vlive_audio_device') || "";
@@ -104,7 +113,12 @@ async function initAudio() {
         }
         const actualId = stream.getAudioTracks()[0]?.getSettings()?.deviceId || "";
         if (actualId) localStorage.setItem('vlive_audio_device', actualId);
-        await refreshDevices();
+        
+        // 장치 목록 갱신은 초기 1회만 하거나 필요할 때만 호출하도록 수정
+        if (!deviceSelect.options.length || deviceSelect.options.length <= 2) {
+            await refreshDevices();
+        }
+        
         if (deviceSelect && actualId) deviceSelect.value = actualId;
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
@@ -393,8 +407,11 @@ function cleanText(text) {
 // ── 자막 시작/종료 ────────────────────────────────────────
 
 async function startProRec() {
+    if (isProRunning) return; // 이미 실행 중이면 무시
+    
     if (!stream) await initAudio();
     if (!stream) { log("마이크 권한이 필요합니다.", true); showToast("마이크 권한이 필요합니다.", "error"); return; }
+    
     const engine = document.getElementById('engine-select').value;
     const localLang = getRecognitionLanguage();
     const serverLang = getRecognitionLanguageForServer();
