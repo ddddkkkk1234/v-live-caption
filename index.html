@@ -172,15 +172,15 @@
             <div class="content-grid">
                 <div class="card transcript-card">
                     <div class="card-header">
-                        <h3>📺 실시간 자막</h3>
+                        <div class="header-title-group">
+                            <span class="header-icon">📺</span>
+                            <input type="text" id="lesson-title" class="custom-input lesson-input-header" placeholder="수업명 입력" oninput="saveLessonMeta()">
+                        </div>
                         <div class="header-actions">
                             <button onclick="toggleFocusMode()" id="focus-mode-btn" class="btn btn-pip">크게</button>
                             <button onclick="togglePIP()" class="btn btn-pip">PIP</button>
                             <button onclick="clearTranscript()" class="btn btn-pip">비우기</button>
                         </div>
-                    </div>
-                    <div class="caption-title-bar">
-                        <input type="text" id="lesson-title" class="custom-input lesson-input" placeholder="수업명 입력" oninput="saveLessonMeta()">
                     </div>
                     <div id="youtube-scroll" class="scroll-area"><div id="youtube-text"></div><div id="interim-text" class="interim"></div></div>
                 </div>
