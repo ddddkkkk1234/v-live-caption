@@ -317,6 +317,13 @@ async function updateAiModelOptions(preferredModel = "") {
         return option;
     }));
     
+    // Hide API key input for keyless local providers
+    const isKeyless = ['ollama', 'lmstudio', 'chrome-built-in', 'local-heuristic'].includes(provider);
+    const keyInputRow = document.getElementById('ai-api-key')?.closest('.ai-key-item');
+    if (keyInputRow) {
+        keyInputRow.style.display = isKeyless ? 'none' : '';
+    }
+
     const savedModel = preferredModel || localStorage.getItem('vlive_ai_model') || models[0].value;
     modelInput.value = models.some((model) => model.value === savedModel) ? savedModel : models[0].value;
     saveAiSettings();
@@ -330,8 +337,10 @@ function updateAiSummary() {
     if (!enabled) { summary.textContent = uiText('serverCredit'); return; }
     const provider = document.getElementById('ai-provider')?.value || 'gemini';
     const model = document.getElementById('ai-model')?.value || '';
-    if (['ollama', 'lmstudio'].includes(provider)) {
-        const provName = provider === 'ollama' ? 'Ollama (로컬)' : 'LM Studio (로컬)';
+    
+    if (['ollama', 'lmstudio', 'chrome-built-in'].includes(provider)) {
+        let provName = provider === 'ollama' ? 'Ollama (로컬)' : 'LM Studio (로컬)';
+        if (provider === 'chrome-built-in') provName = 'Chrome Gemini Nano (로컬)';
         summary.textContent = `${provName} 사용 중${model ? ` · ${model}` : ""}`;
     } else if (provider === 'local-heuristic') {
         summary.textContent = `로컬 오프라인 엔진 (룰베이스 요약) 사용 중`;

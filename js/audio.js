@@ -1729,7 +1729,7 @@ async function callAI(question = null, mode = "summary") {
     const usesServerCredit = aiSettings.provider === 'default';
     const isLocalAI = ['ollama', 'lmstudio'].includes(aiSettings.provider);
     const isHeuristic = aiSettings.provider === 'local-heuristic';
-    const isKeyless = isLocalAI || isHeuristic;
+    const isKeyless = isLocalAI || isHeuristic || aiSettings.provider === 'chrome-built-in';
 
     if (usesServerCredit && typeof currentUser !== 'undefined' && !currentUser) {
         openAuthModal(getAppLanguage() === 'ko' ? '강의자료 정리는 로그인 후 사용할 수 있습니다.' : 'AI summaries are available after logging in.');
