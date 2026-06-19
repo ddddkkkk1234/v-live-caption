@@ -1,0 +1,13 @@
+{
+  "name": "v-live-caption",
+  "version": "1.0.0",
+  "description": "LiveNote - 실시간 자막 및 AI 강의노트",
+  "main": "index.html",
+  "scripts": {
+    "dev": "wrangler pages dev . --compatibility-date=2024-01-01",
+    "build": "echo 'No build step required'"
+  },
+  "devDependencies": {
+    "wrangler": "^3.50.0"
+  }
+}

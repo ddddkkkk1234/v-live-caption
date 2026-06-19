@@ -45,7 +45,7 @@ header, main, footer, .auth-modal {
     max-width: 1400px;
     margin: 0 auto;
     width: 100%;
-    gap: 2rem;
+    gap: 1rem;
 }
 .container.active { display: flex; }
 
@@ -69,6 +69,8 @@ header, main, footer, .auth-modal {
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
     padding: 1.5rem;
     transition: background 0.3s ease, border-color 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 .card:hover {
     background: rgba(30, 30, 30, 0.7);
@@ -142,11 +144,11 @@ header, main, footer, .auth-modal {
     grid-template-columns: 1fr auto 1fr;
     gap: 2rem;
     align-items: start;
-    padding: 1rem 0;
+    padding: 0.5rem 0;
 }
 
 .dash-left {
-    display: flex; flex-direction: column; gap: 1.5rem;
+    display: flex; flex-direction: column; gap: 0.85rem;
     align-items: flex-start;
     justify-self: start;
 }
@@ -157,7 +159,7 @@ header, main, footer, .auth-modal {
     justify-self: center;
 }
 .dash-right {
-    display: flex; flex-direction: column; gap: 1.5rem;
+    display: flex; flex-direction: column; gap: 0.85rem;
     align-items: flex-end;
     justify-self: end;
 }
@@ -243,8 +245,8 @@ body.recording .btn-hero-stop { display: flex; }
 }
 
 /* 콘텐츠 그리드 - 설정 카드 닫히면 위로 올라감 */
-.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex: 1; margin-top: 1.5rem; }
-.settings-card.collapsed + .content-grid { margin-top: -3rem; }
+.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex: 1; margin-top: 0; height: 68vh; }
+.settings-card.collapsed + .premium-card { margin-top: -1rem; }
 
 .card-header { 
     padding: 0 0 1rem 0; 
@@ -259,7 +261,7 @@ body.recording .btn-hero-stop { display: flex; }
     flex: 1; 
     padding: 1.5rem 0; 
     overflow-y: auto; 
-    height: 50vh; 
+    height: 0; 
     line-height: 1.8;
 }
 
@@ -285,7 +287,7 @@ body.recording .btn-hero-stop { display: flex; }
     border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     padding: 1.25rem 1.5rem;
-    margin-top: 1rem;
+    margin-top: 0;
     transition: opacity 0.3s ease, max-height 0.4s ease, margin 0.3s ease, padding 0.3s ease;
     overflow: hidden;
     max-height: 500px;
@@ -556,7 +558,193 @@ body.recording .btn-hero-stop { display: flex; }
 /* 모바일 대응 */
 @media (max-width: 900px) {
     .dashboard-header { grid-template-columns: 1fr; gap: 2rem; }
-    .content-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .content-grid { grid-template-columns: 1fr; gap: 2rem; height: auto; }
+    .card { height: 60vh; }
     .topbar-inner { flex-direction: column; gap: 1rem; }
     .app-nav { gap: 1rem; flex-wrap: wrap; justify-content: center; }
+}
+
+/* 프리미엄 알림 카드 */
+.premium-card {
+    background: rgba(0, 176, 255, 0.05);
+    border: 1px solid rgba(0, 176, 255, 0.15);
+    padding: 10px 20px;
+    border-radius: 12px;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+.premium-card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.premium-icon {
+    font-size: 1.5rem;
+}
+.premium-title {
+    color: #fff;
+    font-weight: 700;
+}
+.premium-desc {
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: 12px;
+}
+.btn-upgrade-action {
+    background: #00B0FF;
+    color: #000;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-upgrade-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 176, 255, 0.3);
+}
+.premium-card.attention {
+    border-color: #FF5252 !important;
+    background: rgba(255, 82, 82, 0.1) !important;
+    animation: pulse-attention 1.5s infinite alternate;
+}
+@keyframes pulse-attention {
+    0% { box-shadow: 0 0 5px rgba(255, 82, 82, 0.2); }
+    100% { box-shadow: 0 0 15px rgba(255, 82, 82, 0.6); }
+}
+
+/* 채팅 컨테이너 및 인풋 박스 스타일 */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.chat-input-box {
+    display: flex;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    border-radius: 12px;
+    margin-top: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    align-items: center;
+}
+.chat-input-box:focus-within {
+    border-color: #00B0FF;
+    box-shadow: 0 0 10px rgba(0, 176, 255, 0.15);
+}
+#chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    padding: 8px 4px;
+}
+#chat-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+.btn-send {
+    background: #00B0FF;
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-send:hover {
+    background: #0091EA;
+    transform: scale(1.02);
+}
+.btn-send:active {
+    transform: scale(0.98);
+}
+
+/* 말풍선 스타일 */
+.chat-bubble-user {
+    align-self: flex-end;
+    background: rgba(0, 176, 255, 0.12);
+    border: 1px solid rgba(0, 176, 255, 0.25);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 16px 16px 4px 16px;
+    max-width: 80%;
+    margin-bottom: 12px;
+    word-break: break-all;
+    animation: fadeInBubble 0.25s ease forwards;
+    margin-left: auto;
+    text-align: left;
+}
+
+.chat-bubble-ai {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fff;
+    padding: 14px;
+    border-radius: 16px 16px 16px 4px;
+    max-width: 85%;
+    margin-bottom: 12px;
+    line-height: 1.6;
+    animation: fadeInBubble 0.25s ease forwards;
+    text-align: left;
+}
+
+.chat-bubble-ai-meta {
+    font-size: 0.75rem;
+    color: #00E676;
+    font-weight: bold;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+@keyframes fadeInBubble {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 하단 글로벌 푸터 디자인 */
+footer {
+    text-align: center;
+    padding: 2.5rem 0;
+    margin-top: 4rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    z-index: 10;
+}
+.footer-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.35);
+}
+.footer-link {
+    color: rgba(255, 255, 255, 0.45);
+    text-decoration: none;
+    transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+.footer-link:hover {
+    color: #00B0FF;
+    text-decoration: underline;
+}
+.footer-separator {
+    color: rgba(255, 255, 255, 0.15);
+    user-select: none;
 }

@@ -5,6 +5,7 @@ let stream = null;
 let isProcessingChunk = false;
 let cloudBackoffUntil = 0;
 let lastLowSignalLogAt = 0;
+let isMicPermissionDenied = false;
 
 console.log("LiveNote Audio Engine Loaded - v1.0.1");
 console.log("Current Protocol:", location.protocol);
@@ -21,7 +22,27 @@ let fallbackWhisperModelId = '';
 // PIP
 let pipActive = false;
 let pipCanvas = document.getElementById('pip-canvas');
+if (!pipCanvas && typeof document !== 'undefined') {
+    pipCanvas = document.createElement('canvas');
+    pipCanvas.id = 'pip-canvas';
+    pipCanvas.width = 800;
+    pipCanvas.height = 450;
+    pipCanvas.style.display = 'none';
+    document.body.appendChild(pipCanvas);
+}
 let pipVideo = document.getElementById('pip-video');
+if (!pipVideo && typeof document !== 'undefined') {
+    pipVideo = document.createElement('video');
+    pipVideo.id = 'pip-video';
+    pipVideo.muted = true;
+    pipVideo.playsInline = true;
+    pipVideo.style.position = 'absolute';
+    pipVideo.style.width = '1px';
+    pipVideo.style.height = '1px';
+    pipVideo.style.opacity = '0';
+    pipVideo.style.pointerEvents = 'none';
+    document.body.appendChild(pipVideo);
+}
 let pipCtx = pipCanvas ? pipCanvas.getContext('2d') : null;
 
 // Session Recording
@@ -84,23 +105,17 @@ async function startProRec() {
     );
 
     if (engine === 'local-whisper') {
-        showToast("내 기기에서 자막 생성을 시작합니다.");
+        showToast(getAppLanguage() === 'ko' ? "로컬 자막 시작" : "Local captions started");
         startLocalWhisper(localLang);
     } else {
-        const sttSettings = getSttRequestSettings();
-        const apiLabel = sttSettings.provider === 'default'
-            ? "LiveNote 서버 크레딧"
-            : `내 ${sttSettings.provider.toUpperCase()} API 키`;
-        showToast(getAppLanguage() === 'ko'
-            ? `${apiLabel}로 클라우드 자막을 시작합니다.`
-            : `Starting cloud captions with ${apiLabel}.`);
+        showToast(getAppLanguage() === 'ko' ? "클라우드 자막 시작" : "Cloud captions started");
         startGroqWhisper(serverLang);
     }
 }
 
 async function startLocalWhisper(lang) {
     log("[로컬 자막] 백그라운드 모델 준비 중...");
-    showToast("로컬 자막 모델을 준비 중입니다.");
+    showToast(getAppLanguage() === 'ko' ? "로컬 모델 준비 중..." : "Preparing local model...");
     document.getElementById('model-loading').style.display = 'block';
     try {
         document.getElementById('model-loading-fill').style.width = "0%";
@@ -322,7 +337,13 @@ function getWhisperWorker() {
         const data = event.data || {};
         if (data.type === 'progress') {
             const fill = document.getElementById('model-loading-fill');
-            if (fill && data.progress?.status === 'progress') fill.style.width = `${data.progress.progress || 0}%`;
+            const modelLoading = document.getElementById('model-loading');
+            if (fill && data.progress?.status === 'progress') {
+                fill.style.width = `${data.progress.progress || 0}%`;
+            }
+            if (modelLoading && (data.progress?.status === 'ready' || data.progress?.status === 'done')) {
+                modelLoading.style.display = 'none';
+            }
             return;
         }
         if (data.type === 'log') {
@@ -359,7 +380,9 @@ async function loadFallbackWhisperPipeline(modelId) {
     }
     const progress = (p) => {
         const fill = document.getElementById('model-loading-fill');
+        const modelLoading = document.getElementById('model-loading');
         if (fill && p.status === 'progress') fill.style.width = `${p.progress || 0}%`;
+        if (modelLoading && (p.status === 'ready' || p.status === 'done')) modelLoading.style.display = 'none';
     };
     try {
         return await fallbackWhisperPipeline('automatic-speech-recognition', modelId, {
@@ -434,12 +457,25 @@ async function handleOutputSelectChange() {
         if (audioContext && typeof audioContext.setSinkId === 'function') await audioContext.setSinkId(deviceId);
         log(`출력 장치 변경: ${deviceId || "기본"}`);
     } catch (e) { log("출력 변경 실패: " + e.message, true); }
+    adjustSelectWidth(outputSelect);
 }
 
 async function handleDeviceSelectChange() {
     const deviceSelect = document.getElementById('device-select');
     if (!deviceSelect || !deviceSelect.value) return;
+    
+    if (deviceSelect.value === MIC_PERMISSION_VALUE) {
+        if (isMicPermissionDenied) {
+            const msg = getAppLanguage() === 'ko'
+                ? "마이크 권한이 완전히 거부되어 자동 요청이 불가능합니다.\n\n해결 방법:\n1. 브라우저 주소창 왼쪽의 자물쇠(설정) 아이콘을 클릭합니다.\n2. 마이크 권한 설정을 '허용'으로 변경합니다.\n3. 페이지를 새로고침(F5)하여 다시 시도해 주세요."
+                : "Microphone permission is denied.\n\nTo fix:\n1. Click the lock/settings icon to the left of the address bar.\n2. Change the Microphone permission to 'Allow'.\n3. Reload the page (F5) and try again.";
+            alert(msg);
+            showToast(msg.replace(/\n/g, " "), "error", 8000);
+            return;
+        }
+    }
     await initAudio();
+    adjustSelectWidth(deviceSelect);
 }
 
 async function refreshDevices() {
@@ -461,6 +497,7 @@ async function refreshDevices() {
                 deviceSelect.appendChild(opt);
             });
             deviceSelect.appendChild(new Option(uiText('micPermission'), MIC_PERMISSION_VALUE));
+            adjustSelectWidth(deviceSelect);
         }
         if (outputSelect) {
             const savedOutId = localStorage.getItem('vlive_audio_output') || "";
@@ -472,8 +509,33 @@ async function refreshDevices() {
                 if (s.deviceId === savedOutId) opt.selected = true;
                 outputSelect.appendChild(opt);
             });
+            adjustSelectWidth(outputSelect);
         }
     } catch (e) {}
+}
+
+function adjustSelectWidth(select) {
+    if (!select) return;
+    const text = select.options[select.selectedIndex]?.text || "";
+    if (!text) return;
+    
+    const tempSpan = document.createElement("span");
+    tempSpan.style.visibility = "hidden";
+    tempSpan.style.position = "absolute";
+    tempSpan.style.whiteSpace = "pre";
+    
+    const style = window.getComputedStyle(select);
+    tempSpan.style.fontSize = style.fontSize;
+    tempSpan.style.fontFamily = style.fontFamily;
+    tempSpan.style.fontWeight = style.fontWeight;
+    
+    tempSpan.textContent = text;
+    document.body.appendChild(tempSpan);
+    const width = tempSpan.getBoundingClientRect().width;
+    
+    // 선택된 텍스트 길이에 맞춰 select 엘리먼트 가로폭을 맞추고 우측 여백 16px 부여
+    select.style.width = Math.min(260, Math.max(70, width + 16)) + "px";
+    document.body.removeChild(tempSpan);
 }
 
 async function initAudio() {
@@ -531,8 +593,19 @@ async function initAudio() {
         setStatus(getAppLanguage() === 'ko' ? "준비 완료" : "Ready", false);
         log("마이크 연결 성공");
     } catch(e) {
-        if (deviceSelect && e.name === 'NotAllowedError') {
-            setupMicrophoneSelect("마이크 권한 필요");
+        if (e.name === 'NotAllowedError') {
+            isMicPermissionDenied = true;
+            if (deviceSelect) {
+                deviceSelect.replaceChildren();
+                const errMsg = getAppLanguage() === 'ko' ? "⚠️ 마이크 권한 없음 (설정 필요)" : "⚠️ Mic Permission Denied (Setup Required)";
+                deviceSelect.appendChild(new Option(errMsg, MIC_PERMISSION_VALUE));
+            }
+            const infoMsg = getAppLanguage() === 'ko'
+                ? "마이크 권한이 거부되었습니다. 주소창 좌측 자물쇠 아이콘에서 권한을 허용한 뒤 F5를 눌러주세요."
+                : "Microphone permission denied. Please allow it by clicking the lock icon next to the address bar, and press F5.";
+            log("마이크 권한 거부됨: " + infoMsg, true);
+            showToast(infoMsg, "error", 8000);
+            return;
         }
         log("마이크 연결 실패: " + e.message, true);
         showToast("마이크 오류: " + e.message, "error");
@@ -992,7 +1065,7 @@ function startSessionRecording() {
         sessionRecorder.start(1000);
         sessionRecordingStartedAt = Date.now();
         log("전체 녹음을 시작했습니다.");
-        showToast("녹음 저장을 시작했습니다. 실시간 자막도 함께 실행됩니다.");
+        showToast(getAppLanguage() === 'ko' ? "녹음 및 자막 시작" : "Recording & captions started");
     } catch (e) {
         log("전체 녹음은 사용할 수 없지만 실시간 자막은 계속 진행합니다.", true);
         showToast("녹음 저장은 사용할 수 없지만 자막은 계속 실행됩니다.", "error");
@@ -1117,4 +1190,188 @@ async function translateCaptionChunk(text) {
     } finally {
         if (typeof translationInFlight !== 'undefined') translationInFlight = false;
     }
+}
+
+async function callAI(question = null, mode = "summary") {
+    const aiArea = document.getElementById('youtube-ai');
+    if (!aiArea) return;
+
+    const transcript = (transcriptText || "").trim();
+    if (transcript.length < 5) {
+        alert(getAppLanguage() === 'ko' ? "정리할 자막 내용이 부족합니다. 자막을 시작해 주세요." : "Not enough caption text to summarize. Please start captions first.");
+        return;
+    }
+
+    const aiSettings = getAiRequestSettings();
+    const usesServerCredit = aiSettings.provider === 'default';
+
+    if (usesServerCredit && typeof currentUser !== 'undefined' && !currentUser) {
+        openAuthModal(getAppLanguage() === 'ko' ? '강의자료 정리는 로그인 후 사용할 수 있습니다.' : 'AI summaries are available after logging in.');
+        return;
+    }
+
+    if (usesServerCredit && typeof hasQuota === 'function' && !hasQuota('aiRequests', 1)) {
+        showUpgradePrompt(getAppLanguage() === 'ko' ? '무료 AI 요청 횟수를 모두 사용했습니다.' : 'You have used all free AI requests.');
+        return;
+    }
+
+    if (!usesServerCredit && !aiSettings.apiKey) {
+        alert(getAppLanguage() === 'ko' ? "개인 API 키를 설정창에 입력해 주세요." : "Please enter your personal API key in settings.");
+        toggleAiSettings();
+        return;
+    }
+
+    // 기본 안내 문구 지우기
+    const placeholderKo = "강의 종료 후 생성 버튼을 누르세요.";
+    const placeholderEn = "After class, create key summaries, review points, and assignment hints.";
+    const currentText = aiArea.innerText.trim();
+    const isPlaceholder = currentText === placeholderKo || currentText === placeholderEn || currentText === "";
+
+    if (isPlaceholder && question) {
+        aiArea.innerHTML = "";
+    }
+
+    let loadingBubble = null;
+    let originalHtml = aiArea.innerHTML;
+
+    if (question) {
+        // 1. 질문하기: 유저 말풍선 추가
+        const userBubble = document.createElement('div');
+        userBubble.className = "chat-bubble-user";
+        userBubble.textContent = question;
+        aiArea.appendChild(userBubble);
+
+        // 2. 질문하기: AI 답변 로딩 말풍선 추가
+        loadingBubble = document.createElement('div');
+        loadingBubble.className = "chat-bubble-ai";
+        const loadingText = getAppLanguage() === 'ko' ? "답변을 작성하고 있습니다..." : "Writing an answer...";
+        loadingBubble.innerHTML = `<div class="chat-bubble-ai-meta">🤖 LiveNote AI</div>
+            <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,0.6); font-size:0.9rem;">
+                <span class="spinner" style="border: 2px solid rgba(0,176,255,0.1); border-top: 2px solid #00B0FF; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block;"></span>
+                ${loadingText}
+            </div>`;
+        aiArea.appendChild(loadingBubble);
+        
+        // 스크롤 아래로
+        aiArea.scrollTo({ top: aiArea.scrollHeight, behavior: 'smooth' });
+    } else {
+        // 3. 강의노트 생성: 기존 영역 비우고 전체 로딩 표시
+        const loadingText = getAppLanguage() === 'ko' ? "✨ AI 강의노트 분석 중..." : "✨ AI analyzing lecture notes...";
+        aiArea.innerHTML = `<div class="ai-loading" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px; font-weight: bold; color: #00B0FF; gap: 12px; height: 100%;">
+            <span class="spinner" style="border: 3px solid rgba(0,176,255,0.1); border-top: 3px solid #00B0FF; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;"></span>
+            <span>${loadingText}</span>
+        </div>`;
+    }
+
+    // 스피너 애니메이션 주입 (중복 방지)
+    if (!document.getElementById('ai-spinner-style')) {
+        const style = document.createElement('style');
+        style.id = 'ai-spinner-style';
+        style.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+    }
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(typeof currentSession !== 'undefined' && currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+            },
+            body: JSON.stringify({
+                text: transcript,
+                question: question || "",
+                mode: mode,
+                minutesType: "lecture",
+                provider: aiSettings.provider,
+                model: aiSettings.model,
+                apiKey: aiSettings.apiKey
+            })
+        });
+
+        const data = await res.json();
+        
+        if (usesServerCredit && res.ok && typeof incrementUsage === 'function') {
+            incrementUsage('aiRequests', 1);
+            if (typeof renderPremiumState === 'function') renderPremiumState();
+        }
+
+        if (!res.ok) {
+            throw new Error(data.result || (getAppLanguage() === 'ko' ? "AI 요청 실패" : "AI Request Failed"));
+        }
+
+        const resultText = data.result || "";
+        
+        if (mode === "minutes") {
+            localStorage.setItem('vlive_last_minutes', resultText);
+        }
+
+        // 결과물 렌더링
+        if (question && loadingBubble) {
+            // 로딩 말풍선 교체
+            loadingBubble.innerHTML = `<div class="chat-bubble-ai-meta">🤖 LiveNote AI</div>
+                <div class="ai-rendered-content" style="line-height:1.7;">
+                    ${renderAiMarkdown(resultText)}
+                </div>`;
+        } else {
+            // 강의노트 전체 덮어쓰기 (노트 생성 모드)
+            aiArea.innerHTML = `<div class="chat-bubble-ai" style="display:block; max-width:100%; border-radius:16px; background:rgba(255,255,255,0.02); border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 0;">
+                <div class="chat-bubble-ai-meta">🤖 LiveNote AI 강의노트</div>
+                <div class="ai-rendered-content" style="line-height:1.7;">
+                    ${renderAiMarkdown(resultText)}
+                </div>
+            </div>`;
+        }
+        
+        // 스크롤 아래로 부드럽게 이동
+        setTimeout(() => {
+            aiArea.scrollTo({ top: aiArea.scrollHeight, behavior: 'smooth' });
+        }, 50);
+
+    } catch (e) {
+        if (question) {
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) chatInput.value = question;
+        }
+        aiArea.innerHTML = originalHtml;
+        showToast(e.message, "error");
+        alert(getAppLanguage() === 'ko' ? `AI 오류: ${e.message}` : `AI Error: ${e.message}`);
+    }
+}
+
+function renderAiMarkdown(md) {
+    if (!md) return "";
+    let html = escapeHtml(md);
+    
+    // 헤더 파싱 (프리미엄 색상 매핑)
+    html = html.replace(/^### (.*$)/gim, '<h4 style="color:#00B0FF; margin-top:20px; margin-bottom:8px; font-weight:700;">$1</h4>');
+    html = html.replace(/^## (.*$)/gim, '<h3 style="color:#00E676; margin-top:25px; margin-bottom:12px; font-weight:700; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px;">$1</h3>');
+    html = html.replace(/^# (.*$)/gim, '<h2 style="color:#fff; margin-top:30px; margin-bottom:15px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:10px;">$1</h2>');
+    
+    // 리스트 파싱
+    html = html.replace(/^\- (.*$)/gim, '<li style="margin-left:15px; margin-bottom:8px; list-style-type:square; color:rgba(255,255,255,0.85);">$1</li>');
+    
+    // 볼드 처리
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#00B0FF; font-weight:600;">$1</strong>');
+    
+    // 개별 라인 줄바꿈 처리
+    html = html.split('\n').map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('<h') || trimmed.startsWith('<li') || trimmed.startsWith('</li') || trimmed.startsWith('<ul') || trimmed.startsWith('</ul')) {
+            return line;
+        }
+        return line ? `${line}<br>` : '<div style="height:10px;"></div>';
+    }).join('\n');
+    
+    return html;
+}
+
+function handleChatSubmit(event) {
+    if (event) event.preventDefault();
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    const value = input.value.trim();
+    if (!value) return;
+    input.value = ""; // 즉각적인 피드백을 위해 먼저 비웁니다
+    callAI(value);
 }

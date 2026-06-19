@@ -53,6 +53,7 @@
                 <a class="nav-item" href="docs/guide.html">사용 가이드</a>
             </nav>
             <div class="topbar-actions">
+                <span id="plan-badge" style="background: rgba(0, 176, 255, 0.15); color: #00B0FF; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; display: none;">Free</span>
                 <div class="status-badge"><div id="status-dot" class="status-dot"></div><span id="status-text">준비됨</span></div>
                 <div class="volume-meter">
                     <div class="v-bar"><div id="v-fill" class="v-fill"></div></div>
@@ -96,7 +97,7 @@
                 </div>
                 <div class="dash-center">
                     <button onclick="startProRec()" id="pro-start" class="btn-hero-start">
-                        <span class="icon">🎤</span><span class="text">자막 시작</span>
+                        <span class="icon">🎤</span><span class="text">시작</span>
                     </button>
                     <button onclick="stopProRec()" id="pro-stop" class="btn-hero-stop" disabled>
                         <span class="icon">⏹</span><span class="text">종료</span>
@@ -155,6 +156,18 @@
                 </div>
             </div>
 
+            <!-- 프리미엄 요금제 알림 카드 -->
+            <div id="premium-card" class="premium-card">
+                <div class="premium-card-left">
+                    <span class="premium-icon">⚡</span>
+                    <div>
+                        <strong class="premium-title">LiveNote Premium</strong>
+                        <span id="premium-meter" class="premium-desc">사용량 확인 중...</span>
+                    </div>
+                </div>
+                <button onclick="openPricingModal()" class="btn-upgrade-action">업그레이드</button>
+            </div>
+
             <div class="content-grid">
                 <div class="card transcript-card">
                     <div class="card-header">
@@ -192,10 +205,10 @@
                             </div>
                         </div>
                         <div id="youtube-ai" class="scroll-area">강의 종료 후 생성 버튼을 누르세요.</div>
-                        <div class="chat-input-box">
-                            <input type="text" id="chat-input" placeholder="질문하기" onkeypress="if(event.keyCode==13) callAI(this.value)">
-                            <button onclick="callAI(document.getElementById('chat-input').value)" class="btn-send">전송</button>
-                        </div>
+                        <form onsubmit="handleChatSubmit(event)" class="chat-input-box">
+                            <input type="text" id="chat-input" placeholder="질문하기" autocomplete="off">
+                            <button type="submit" class="btn-send">전송</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -239,6 +252,119 @@
             </div>
         </div>
 
+        <!-- 로그인 모달 -->
+        <div id="auth-modal" class="modal-overlay" onclick="closeAuthModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeAuthModal()">✕</button>
+                <h2>로그인 / 회원가입</h2>
+                <p id="auth-modal-note" class="modal-desc">Premium 기능을 계정에 연결하려면 먼저 로그인하세요.</p>
+                
+                <div class="auth-form" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                    <input type="email" id="auth-email" class="custom-input" placeholder="이메일 주소 입력" style="text-align: center;">
+                    <button onclick="sendMagicLink()" class="btn btn-hero-start" style="width: 100%; padding: 12px; font-size: 1rem; margin: 0;">
+                        ✉️ 이메일 매직 링크 전송
+                    </button>
+                    
+                    <div style="margin: 15px 0; border-top: 1px solid rgba(255,255,255,0.1); position: relative;">
+                        <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #1a1a1a; padding: 0 10px; font-size: 0.8rem; color: rgba(255,255,255,0.4);">또는</span>
+                    </div>
+                    
+                    <button onclick="signInWithGoogle()" class="btn" style="width: 100%; padding: 12px; font-size: 1rem; background: #fff; color: #000; border: none; font-weight: bold; border-radius: 12px; margin: 0;">
+                        Google로 계속하기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 마이페이지 모달 -->
+        <div id="account-modal" class="modal-overlay" onclick="closeAccountModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeAccountModal()">✕</button>
+                <h2>마이페이지</h2>
+                <p class="modal-desc">내 계정 및 이용량 정보를 확인하세요.</p>
+                
+                <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 16px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 12px;">
+                    <div><span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; display: block;">이메일 계정</span><strong id="account-email" style="font-size: 1.1rem; color: #fff;">-</strong></div>
+                    <div><span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; display: block;">현재 요금제</span><strong id="account-plan" style="font-size: 1.1rem; color: #00B0FF;">Free</strong></div>
+                    <div><span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; display: block;">클라우드 음성인식 사용량 (오늘)</span><strong id="account-cloud-usage" style="font-size: 1.1rem; color: #fff;">0분 / 10분</strong></div>
+                    <div><span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; display: block;">AI 강의노트 생성 (오늘)</span><strong id="account-ai-usage" style="font-size: 1.1rem; color: #fff;">0회 / 3회</strong></div>
+                </div>
+
+                <div id="auth-status" style="font-size: 0.85rem; color: rgba(255,255,255,0.5); margin-bottom: 20px;"></div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button id="premium-activate-btn" onclick="openPricingModal(); closeAccountModal();" class="btn btn-hero-start" style="flex: 1; padding: 12px; font-size: 0.95rem; margin: 0;">
+                        ⚡ Premium 업그레이드
+                    </button>
+                    <button onclick="signOut(); closeAccountModal();" class="btn" style="flex: 1; padding: 12px; font-size: 0.95rem; background: rgba(255, 82, 82, 0.15); color: #FF5252; border: 1px solid rgba(255, 82, 82, 0.3); margin: 0;">
+                        로그아웃
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 요금제 업그레이드 모달 (Pricing) -->
+        <div id="pricing-modal" class="modal-overlay" onclick="closePricingModal()">
+            <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px;">
+                <button class="modal-close" onclick="closePricingModal()">✕</button>
+                <h2>요금제 선택</h2>
+                <p class="modal-desc">나에게 맞는 플랜을 선택하여 더 스마트한 기능을 사용해 보세요.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; text-align: left;">
+                    <!-- Free Plan -->
+                    <div style="flex: 1; min-width: 220px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 24px; border-radius: 16px; display: flex; flex-direction: column;">
+                        <h3 style="margin-top: 0; color: #fff;">Free</h3>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin: 10px 0;">₩0 <span style="font-size: 0.9rem; font-weight: normal; color: rgba(255,255,255,0.4);">/ 평생 무료</span></div>
+                        <ul style="padding-left: 18px; margin: 15px 0; font-size: 0.85rem; color: rgba(255,255,255,0.6); display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                            <li>내 기기 기반 실시간 자막</li>
+                            <li>텍스트(TXT) 파일 내보내기</li>
+                            <li>AI 강의노트 일일 3회 제한</li>
+                            <li>클라우드 자막 일일 10분 제한</li>
+                        </ul>
+                        <button onclick="closePricingModal()" class="btn" style="width: 100%; padding: 10px; font-size: 0.9rem; margin-top: 15px; background: rgba(255,255,255,0.1); color: #fff; border: none;">이용 중</button>
+                    </div>
+                    
+                    <!-- Premium Plan -->
+                    <div style="flex: 1; min-width: 220px; background: rgba(0, 176, 255, 0.05); border: 1px solid rgba(0, 176, 255, 0.2); padding: 24px; border-radius: 16px; display: flex; flex-direction: column; position: relative;">
+                        <span style="position: absolute; top: -12px; right: 16px; background: #00B0FF; color: #000; font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 12px;">추천</span>
+                        <h3 style="margin-top: 0; color: #00B0FF;">Premium</h3>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #00B0FF; margin: 10px 0;">₩9,900 <span style="font-size: 0.9rem; font-weight: normal; color: rgba(255,255,255,0.4);">/ 월</span></div>
+                        <ul style="padding-left: 18px; margin: 15px 0; font-size: 0.85rem; color: rgba(255,255,255,0.7); display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                            <li><strong>클라우드 고정밀 자막 600분/월</strong></li>
+                            <li><strong>AI 강의노트 및 질문 300회/월</strong></li>
+                            <li>SRT, VTT 자막 다운로드</li>
+                            <li>PDF 다운로드 기능 제공</li>
+                            <li>긴 녹음 최종 변환 (60회/월)</li>
+                        </ul>
+                        <button onclick="startCheckout('premium')" class="btn btn-hero-start" style="width: 100%; padding: 10px; font-size: 0.9rem; margin-top: 15px; margin-bottom: 0;">시작하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 제한 초과 알림 모달 -->
+        <div id="upgrade-modal" class="modal-overlay" onclick="closeUpgradeModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeUpgradeModal()">✕</button>
+                <div style="font-size: 3rem; margin-bottom: 15px;">⚡</div>
+                <h2>사용 한도 초과</h2>
+                <p id="upgrade-modal-reason" class="modal-desc">사용 한도를 초과했습니다. Premium으로 계속 이용해 보세요.</p>
+                
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 25px; font-size: 0.9rem; color: rgba(255,255,255,0.6);">
+                    현재 사용량: <span id="upgrade-usage" style="color: #00B0FF; font-weight: bold;">-</span>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeUpgradeModal()" class="btn" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.08); border: none; color: #fff; margin: 0;">
+                        취소
+                    </button>
+                    <button onclick="continueUpgradeFlow()" class="btn btn-hero-start" style="flex: 1; padding: 12px; margin: 0;">
+                        업그레이드 하기
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 공유 세션 컨테이너 -->
         <div id="shared-container" class="container">
             <div class="card" style="flex:1;">
@@ -251,24 +377,25 @@
         <div id="mic-container" class="container">
             <div class="card">
                 <div class="card-header">
-                    <h3>📁 지난 자막 기록</h3>
+                    <h3>📁 지난 자막 기록 <span id="history-limit-label" style="font-size: 0.85rem; color: rgba(255,255,255,0.4); margin-left: 10px; font-weight: normal;"></span></h3>
                     <button onclick="clearAllHistory()" class="btn btn-pip" style="color:var(--danger);">전체 삭제</button>
                 </div>
                 <div id="history-list" class="scroll-area" style="height: 70vh;">기록이 없습니다.</div>
             </div>
         </div>
 
-        <!-- 디버그 로그 창 (임시) -->
-        <div id="debug-container" class="container" style="display:block; margin-top: 2rem;">
-            <div class="card" style="background: rgba(0,0,0,0.8); border: 1px solid #333;">
-                <div class="card-header"><h3>⚙️ 시스템 로그</h3></div>
-                <div id="debug-log" class="scroll-area" style="height: 150px; font-family: monospace; font-size: 0.8rem; background: #000; padding: 10px;">시스템 대기 중...</div>
-            </div>
-        </div>
+
     </main>
 
     <footer>
-        <p>© 2026 LiveNote. smarttool_lee@naver.com</p>
+        <div class="footer-content">
+            <span>© 2026 LiveNote. All rights reserved.</span>
+            <a href="mailto:smarttool_lee@naver.com" class="footer-link">smarttool_lee@naver.com</a>
+            <span class="footer-separator">|</span>
+            <a href="docs/privacy.html" class="footer-link">개인정보처리방침</a>
+            <span class="footer-separator">|</span>
+            <a href="docs/terms.html" class="footer-link">이용약관</a>
+        </div>
     </footer>
 
     <!-- 스크립트 라이브러리 -->

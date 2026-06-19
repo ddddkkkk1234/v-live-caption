@@ -1,0 +1,21 @@
+# Supabase 설정 (인증 및 데이터베이스 기록 관리용)
+SUPABASE_URL=https://your-supabase-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+# API 허용 오리진 (쉼표로 구분, 비워두면 요청받은 도메인 허용)
+ALLOWED_ORIGINS=http://localhost:8788,http://127.0.0.1:8788
+
+# AI 및 STT 제공업체 API 키 (클라우드 모드 및 요약 생성용)
+GEMINI_API_KEY=your-gemini-api-key
+OPENAI_API_KEY=your-openai-api-key
+GROQ_API_KEY=your-groq-api-key
+GLADIA_API_KEY=your-gladia-api-key
+SPEECHMATICS_API_KEY=your-speechmatics-api-key
+IBM_STT_API_KEY=your-ibm-stt-api-key
+AZURE_SPEECH_KEY=your-azure-speech-key
+
+# 결제 및 결제 완료 후 리다이렉트 URL
+PAYMENT_URL_PREMIUM=https://buy.stripe.com/mock-premium-link
+PAYMENT_URL_PRO=https://buy.stripe.com/mock-pro-link
+PAYMENT_WEBHOOK_SECRET=your-payment-webhook-secret
