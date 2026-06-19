@@ -88,7 +88,8 @@
                         <label>설정</label>
                         <div class="selector-inline">
                             <select id="engine-select" onchange="updateEngineSettingsVisibility()">
-                                <option value="local-whisper" selected>내 기기</option>
+                                <option value="browser-speech" selected>일반 (웹 표준)</option>
+                                <option value="local-whisper">내 기기</option>
                                 <option value="groq">클라우드</option>
                             </select>
                             <button onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip">⚙️</button>

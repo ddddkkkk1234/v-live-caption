@@ -18,6 +18,7 @@ let whisperModelId = '';
 let fallbackWhisperPipeline = null;
 let fallbackWhisperInstance = null;
 let fallbackWhisperModelId = '';
+let browserSpeechRecognition = null;
 
 // PIP
 let pipActive = false;
@@ -104,12 +105,85 @@ async function startProRec() {
         true
     );
 
-    if (engine === 'local-whisper') {
+    if (engine === 'browser-speech') {
+        showToast(getAppLanguage() === 'ko' ? "일반 자막 시작" : "Browser captions started");
+        startBrowserSpeech(localLang);
+    } else if (engine === 'local-whisper') {
         showToast(getAppLanguage() === 'ko' ? "로컬 자막 시작" : "Local captions started");
         startLocalWhisper(localLang);
     } else {
         showToast(getAppLanguage() === 'ko' ? "클라우드 자막 시작" : "Cloud captions started");
         startGroqWhisper(serverLang);
+    }
+}
+
+function startBrowserSpeech(lang) {
+    log("[브라우저 자막] 웹 표준 API 사용 시작");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        showToast(
+            getAppLanguage() === 'ko' 
+                ? "이 브라우저는 웹 표준 자막 기능을 지원하지 않습니다. 크롬 브라우저를 사용해 주세요." 
+                : "This browser does not support browser captions. Please use Chrome.", 
+            "error"
+        );
+        stopProRec();
+        return;
+    }
+
+    browserSpeechRecognition = new SpeechRecognition();
+    browserSpeechRecognition.lang = lang === 'en' ? 'en-US' : (lang === 'ja' ? 'ja-JP' : 'ko-KR');
+    browserSpeechRecognition.continuous = true;
+    browserSpeechRecognition.interimResults = true;
+
+    browserSpeechRecognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+
+        if (finalTranscript) {
+            const cleaned = cleanText(finalTranscript);
+            if (cleaned) {
+                appendCaptionChunk(cleaned, 4000);
+            }
+        }
+        
+        const interimEl = document.getElementById('interim-text');
+        if (interimEl) {
+            interimEl.innerText = interimTranscript;
+        }
+    };
+
+    browserSpeechRecognition.onerror = (event) => {
+        log("[브라우저 자막 오류] " + event.error, true);
+        if (event.error === 'not-allowed') {
+            showToast(getAppLanguage() === 'ko' ? "마이크 권한이 필요합니다." : "Microphone permission denied.", "error");
+            stopProRec();
+        }
+    };
+
+    browserSpeechRecognition.onend = () => {
+        if (isProRunning && browserSpeechRecognition) {
+            try {
+                browserSpeechRecognition.start();
+            } catch (e) {
+                console.error("브라우저 자막 재시작 실패:", e);
+            }
+        }
+    };
+
+    try {
+        browserSpeechRecognition.start();
+    } catch (e) {
+        log("브라우저 자막 시작 오류: " + e.message, true);
+        stopProRec();
     }
 }
 
@@ -242,6 +316,15 @@ function startGroqWhisper(lang) {
 function stopProRec() { 
     isProRunning = false; isProcessingChunk = false; clearTimeout(proInterval);
     proInterval = null;
+    if (browserSpeechRecognition) {
+        try {
+            browserSpeechRecognition.onend = null;
+            browserSpeechRecognition.stop();
+        } catch (e) {
+            console.error("브라우저 자막 종료 오류:", e);
+        }
+        browserSpeechRecognition = null;
+    }
     stopSessionRecording();
     whisperRequests.forEach(({ reject }) => reject(new Error("세션이 종료되었습니다.")));
     whisperRequests.clear();
