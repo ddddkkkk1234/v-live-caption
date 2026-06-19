@@ -46,18 +46,33 @@ async function getPublicConfig() {
 // ── 인증 상태 ─────────────────────────────────────────────
 
 async function initAuthState() {
+    // If not explicitly logged out, start as premium demo user by default for live preview
+    if (!localStorage.getItem('vlive_logged_out') && !currentUser) {
+        localStorage.setItem(PLAN_KEY, 'premium');
+        currentUser = {
+            id: "local-vip",
+            email: "premium-user@livecaption.com"
+        };
+    }
+    
     renderAuthState();
     try {
         const client = await ensureSupabaseClient();
         const { data } = await client.auth.getSession();
         currentSession = data?.session || null;
-        currentUser = currentSession?.user || null;
+        if (currentSession?.user) {
+            currentUser = currentSession.user;
+            localStorage.removeItem('vlive_logged_out');
+        }
         enforcePremiumRequiresAuth();
         renderAuthState();
         if (currentUser) await fetchServerUsage();
         client.auth.onAuthStateChange((_event, session) => {
             currentSession = session || null;
             currentUser = currentSession?.user || null;
+            if (currentUser) {
+                localStorage.removeItem('vlive_logged_out');
+            }
             enforcePremiumRequiresAuth();
             renderAuthState();
             if (currentUser) fetchServerUsage();
@@ -65,8 +80,21 @@ async function initAuthState() {
         });
     } catch (e) {
         enforcePremiumRequiresAuth();
-        renderAuthState(e.message || "Auth is not configured.");
+        renderAuthState();
     }
+}
+
+function loginAsMockPremium() {
+    localStorage.removeItem('vlive_logged_out');
+    localStorage.setItem(PLAN_KEY, 'premium');
+    currentUser = {
+        id: "local-vip",
+        email: "premium-user@livecaption.com"
+    };
+    renderAuthState();
+    renderPremiumState();
+    closeAuthModal();
+    showToast("Premium 데모 권한이 활성화되었습니다! 👑");
 }
 
 function renderAuthState(message = "") {
