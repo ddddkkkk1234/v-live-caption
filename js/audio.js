@@ -22,6 +22,10 @@ let browserSpeechRecognition = null;
 
 // PIP
 let pipActive = false;
+let pipMode = 1;
+let pipAnimationId = null;
+let lastPipRenderTime = 0;
+let currentVolumeLevel = 0;
 let pipCanvas = document.getElementById('pip-canvas');
 if (!pipCanvas && typeof document !== 'undefined') {
     pipCanvas = document.createElement('canvas');
@@ -108,9 +112,6 @@ async function startProRec() {
     if (engine === 'browser-speech') {
         showToast(getAppLanguage() === 'ko' ? "일반 자막 시작" : "Browser captions started");
         startBrowserSpeech(localLang);
-    } else if (engine === 'local-whisper') {
-        showToast(getAppLanguage() === 'ko' ? "로컬 자막 시작" : "Local captions started");
-        startLocalWhisper(localLang);
     } else {
         showToast(getAppLanguage() === 'ko' ? "클라우드 자막 시작" : "Cloud captions started");
         startGroqWhisper(serverLang);
@@ -670,11 +671,11 @@ async function initAudio() {
                 analyser.getByteFrequencyData(data);
                 let sum = 0; for(let i=0; i<data.length; i++) sum += data[i];
                 let avg = Math.round((sum / data.length) * 4.8); 
+                currentVolumeLevel = avg;
                 const vFill = document.getElementById('v-fill');
                 const vLabel = document.getElementById('v-label');
                 if (vFill) vFill.style.width = Math.min(100, avg) + "%";
                 if (vLabel) vLabel.innerText = Math.min(100, avg) + "%";
-                if (pipActive) updatePipCanvas();
             }
         }
         requestAnimationFrame(draw);
@@ -700,26 +701,346 @@ async function initAudio() {
     }
 }
 
-function updatePipCanvas() {
-    if (!pipActive || !pipCtx) return;
-    pipCtx.fillStyle = "black"; pipCtx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
-    pipCtx.fillStyle = document.getElementById('text-color-picker').value;
-    const fontSize = parseFloat(document.getElementById('font-size-slider').value) * 32;
-    pipCtx.font = `bold ${fontSize}px Pretendard, sans-serif`; pipCtx.textAlign = "center";
-    const youtubeText = document.getElementById('youtube-text');
-    const fullText = (youtubeText ? youtubeText.innerText : "").trim();
-    const words = fullText.split(' ').slice(-8).join(' ');
-    pipCtx.fillText(words, pipCanvas.width/2, pipCanvas.height/2 + 15);
+// Custom wrap text function to handle character-based wrapping for languages without spaces (like Korean/Japanese)
+function wrapText(ctx, text, maxWidth) {
+    const lines = [];
+    const paragraphs = text.split('\n');
+    
+    for (const paragraph of paragraphs) {
+        const words = paragraph.split(' ');
+        let currentLine = '';
+        
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            const testLine = currentLine ? currentLine + ' ' + word : word;
+            const metrics = ctx.measureText(testLine);
+            
+            if (metrics.width > maxWidth) {
+                // If single word itself exceeds maxWidth, wrap it character-by-character
+                const wordWidth = ctx.measureText(word).width;
+                if (wordWidth > maxWidth) {
+                    if (currentLine) {
+                        lines.push(currentLine);
+                        currentLine = '';
+                    }
+                    for (let j = 0; j < word.length; j++) {
+                        const char = word[j];
+                        const testCharLine = currentLine + char;
+                        if (ctx.measureText(testCharLine).width > maxWidth) {
+                            lines.push(currentLine);
+                            currentLine = char;
+                        } else {
+                            currentLine = testCharLine;
+                        }
+                    }
+                } else {
+                    if (currentLine) lines.push(currentLine);
+                    currentLine = word;
+                }
+            } else {
+                currentLine = testLine;
+            }
+        }
+        if (currentLine) {
+            lines.push(currentLine);
+        }
+    }
+    return lines;
 }
 
-async function togglePIP() {
+function updatePipCanvas() {
+    if (!pipActive || !pipCtx) return;
+
+    const width = pipCanvas.width;
+    const height = pipCanvas.height;
+
+    if (pipMode === 1) {
+        // --- PIP 1: Premium Rich UI ---
+        // 1. Draw modern dark premium space-gray/midnight-blue gradient background
+        const grad = pipCtx.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, '#0a0a0f');
+        grad.addColorStop(1, '#14141f');
+        pipCtx.fillStyle = grad;
+        pipCtx.fillRect(0, 0, width, height);
+
+        // 2. Draw high-tech background grid lines with extremely low opacity
+        pipCtx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+        pipCtx.lineWidth = 1;
+        const gridSpacing = 40;
+        for (let x = 0; x < width; x += gridSpacing) {
+            pipCtx.beginPath();
+            pipCtx.moveTo(x, 0);
+            pipCtx.lineTo(x, height);
+            pipCtx.stroke();
+        }
+        for (let y = 0; y < height; y += gridSpacing) {
+            pipCtx.beginPath();
+            pipCtx.moveTo(0, y);
+            pipCtx.lineTo(width, y);
+            pipCtx.stroke();
+        }
+
+        // 3. Draw pulsating neon ambient glow based on microphone input
+        const vol = Math.min(100, currentVolumeLevel || 0); // 0 to 100
+        const pulse = Math.sin(Date.now() / 800) * 0.05 + 0.95; // Gently pulse between 0.9 and 1.0
+        const glowIntensity = (0.04 + (vol / 100) * 0.14) * pulse;
+        const glowRadius = 160 + (vol / 100) * 120;
+        
+        const radGrad = pipCtx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, glowRadius);
+        radGrad.addColorStop(0, `rgba(0, 176, 255, ${glowIntensity})`);       // Neon Cyan
+        radGrad.addColorStop(0.5, `rgba(213, 0, 249, ${glowIntensity * 0.5})`); // Neon Purple
+        radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        pipCtx.fillStyle = radGrad;
+        pipCtx.beginPath();
+        pipCtx.arc(width / 2, height / 2, glowRadius, 0, Math.PI * 2);
+        pipCtx.fill();
+
+        // 4. Draw outer border glow (Chic glassmorphism frame)
+        pipCtx.strokeStyle = 'rgba(0, 176, 255, 0.2)';
+        pipCtx.lineWidth = 4;
+        pipCtx.shadowColor = 'rgba(0, 176, 255, 0.35)';
+        pipCtx.shadowBlur = 8;
+        if (typeof pipCtx.roundRect === 'function') {
+            pipCtx.beginPath();
+            pipCtx.roundRect(8, 8, width - 16, height - 16, 16);
+            pipCtx.stroke();
+        } else {
+            pipCtx.strokeRect(8, 8, width - 16, height - 16);
+        }
+        pipCtx.shadowBlur = 0; // Reset shadow immediately
+
+        // 5. Draw Brand Badge & REC Indicator
+        // Brand signature label
+        pipCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        pipCtx.font = '600 15px Pretendard, system-ui, sans-serif';
+        pipCtx.textAlign = 'left';
+        pipCtx.fillText('LiveNote PIP 자막', 28, 40);
+
+        // Pulsating REC blinker
+        const recAlpha = 0.4 + 0.6 * Math.abs(Math.sin(Date.now() / 250)); // Fast pulse
+        // REC text
+        pipCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        pipCtx.font = '500 13px Pretendard, system-ui, sans-serif';
+        pipCtx.textAlign = 'right';
+        pipCtx.fillText('REC', width - 52, 40);
+
+        // REC outer glowing ring
+        pipCtx.fillStyle = `rgba(255, 82, 82, ${recAlpha * 0.25})`;
+        pipCtx.beginPath();
+        pipCtx.arc(width - 36, 35, 10, 0, Math.PI * 2);
+        pipCtx.fill();
+
+        // REC inner solid core
+        pipCtx.fillStyle = `rgba(255, 82, 82, ${recAlpha})`;
+        pipCtx.beginPath();
+        pipCtx.arc(width - 36, 35, 5, 0, Math.PI * 2);
+        pipCtx.fill();
+    } else {
+        // --- PIP 2: Clean Text-Only Mode ---
+        // Respect the user's custom background color (useful for matching screens or OBS chroma key)
+        const userBgColor = localStorage.getItem('vlive_caption_bg') || document.getElementById('caption-bg-picker')?.value || '#050505';
+        pipCtx.fillStyle = userBgColor;
+        pipCtx.fillRect(0, 0, width, height);
+    }
+
+    // 6. Retrieve text lines & apply custom styling
+    const youtubeText = document.getElementById('youtube-text');
+    const interimText = document.getElementById('interim-text');
+    const finalStr = (youtubeText ? youtubeText.innerText : "").trim();
+    const interimStr = (interimText ? interimText.innerText : "").trim();
+    
+    let fullText = finalStr;
+    if (interimStr) {
+        fullText = fullText ? (fullText + " " + interimStr) : interimStr;
+    }
+    
+    let isWaiting = false;
+    if (!fullText) {
+        fullText = "음성을 인식하면 이곳에 실시간 자막이 표시됩니다.";
+        isWaiting = true;
+    }
+
+    // Setup typography scale
+    const storedSize = localStorage.getItem('vlive_font_size');
+    const sliderVal = storedSize ? parseFloat(storedSize) : parseFloat(document.getElementById('font-size-slider')?.value || "1.4");
+    // Make text slightly larger in text-only mode for even better legibility
+    let fontSize = sliderVal * (pipMode === 2 ? 26 : 24);
+    const maxWidth = width - 100;
+    
+    // Dynamic text wrapper with autoscale font size down
+    const maxVisibleLines = 3;
+    const minFontSize = 18;
+    let lines = [];
+    
+    while (fontSize >= minFontSize) {
+        pipCtx.font = `600 ${fontSize}px Pretendard, system-ui, sans-serif`;
+        lines = wrapText(pipCtx, fullText, maxWidth);
+        if (lines.length <= maxVisibleLines) {
+            break;
+        }
+        fontSize -= 2; // scale down
+    }
+    
+    if (lines.length > maxVisibleLines) {
+        lines = lines.slice(-maxVisibleLines);
+    }
+
+    const lineHeight = fontSize * 1.55;
+    // Center text vertically
+    const startY = height / 2 - ((lines.length - 1) * lineHeight) / 2 + 5;
+
+    // Retrieve user custom style settings for subtitle plate
+    const userTextColor = localStorage.getItem('vlive_text_color') || document.getElementById('text-color-picker')?.value || '#FFEB3B';
+    
+    // Draw subtitle background plate (Netflix-style rounded box, only in Mode 1)
+    if (pipMode === 1 && lines.length > 0) {
+        const userBgColor = localStorage.getItem('vlive_caption_bg') || document.getElementById('caption-bg-picker')?.value || '#000000';
+        let userBgOpacity = parseFloat(localStorage.getItem('vlive_caption_bg_opacity') || document.getElementById('caption-bg-opacity')?.value || '0');
+        if (userBgOpacity === 0) userBgOpacity = 0.65;
+        
+        const hexToRgb = (hex) => {
+            const clean = String(hex || "#000000").replace("#", "");
+            const val = clean.length === 3 ? clean.split("").map((ch) => ch + ch).join("") : clean;
+            const num = parseInt(val, 16);
+            return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+        };
+        const rgb = hexToRgb(userBgColor);
+        const boxBgStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${userBgOpacity})`;
+
+        let maxLineWidth = 0;
+        for (const line of lines) {
+            const metrics = pipCtx.measureText(line);
+            if (metrics.width > maxLineWidth) {
+                maxLineWidth = metrics.width;
+            }
+        }
+        
+        const boxPaddingX = 28;
+        const boxPaddingY = 18;
+        const boxWidth = Math.min(width - 60, maxLineWidth + boxPaddingX * 2);
+        const boxHeight = lines.length * lineHeight + boxPaddingY * 2;
+        const boxX = (width - boxWidth) / 2;
+        const boxY = startY - (fontSize * 0.8) - boxPaddingY + 5;
+        
+        pipCtx.fillStyle = boxBgStyle;
+        pipCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        pipCtx.lineWidth = 1.5;
+        
+        pipCtx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+        pipCtx.shadowBlur = 12;
+        pipCtx.shadowOffsetY = 4;
+        
+        if (typeof pipCtx.roundRect === 'function') {
+            pipCtx.beginPath();
+            pipCtx.roundRect(boxX, boxY, boxWidth, boxHeight, 14);
+            pipCtx.fill();
+            pipCtx.stroke();
+        } else {
+            pipCtx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        }
+        
+        // Reset shadow
+        pipCtx.shadowBlur = 0;
+        pipCtx.shadowOffsetY = 0;
+    }
+
+    // Draw subtitle lines with drop shadow for premium contrast
+    pipCtx.textAlign = 'center';
+    pipCtx.fillStyle = isWaiting ? 'rgba(255, 255, 255, 0.35)' : userTextColor;
+    
+    // In Mode 2 (Text-Only), make the shadow slightly stronger to stand out on dark backings
+    pipCtx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    pipCtx.shadowBlur = pipMode === 2 ? 10 : 8;
+    pipCtx.shadowOffsetX = pipMode === 2 ? 2 : 1;
+    pipCtx.shadowOffsetY = pipMode === 2 ? 2 : 2;
+    
+    for (let j = 0; j < lines.length; j++) {
+        pipCtx.fillText(lines[j], width / 2, startY + (j * lineHeight));
+    }
+    
+    pipCtx.shadowBlur = 0;
+    pipCtx.shadowOffsetX = 0;
+    pipCtx.shadowOffsetY = 0;
+
+    // 7. Draw animated glowing neon audio visualizer wave at the bottom (Only in Mode 1)
+    if (pipMode === 1) {
+        const vol = Math.min(100, currentVolumeLevel || 0); // 0 to 100
+        const barCount = 25;
+        const maxBarHeight = 35;
+        const barWidth = 6;
+        const barGap = 4;
+        const totalVisualizerWidth = barCount * (barWidth + barGap) - barGap;
+        const startX = (width - totalVisualizerWidth) / 2;
+        
+        const visGrad = pipCtx.createLinearGradient(startX, 0, startX + totalVisualizerWidth, 0);
+        visGrad.addColorStop(0, '#00B0FF'); // Neon Cyan
+        visGrad.addColorStop(0.5, '#D500F9'); // Neon Purple
+        visGrad.addColorStop(1, '#00E5FF'); // Bright Cyan
+        
+        pipCtx.fillStyle = visGrad;
+        pipCtx.shadowColor = 'rgba(0, 176, 255, 0.4)';
+        pipCtx.shadowBlur = 6;
+        
+        for (let i = 0; i < barCount; i++) {
+            const k = i - Math.floor(barCount / 2);
+            const factor = Math.cos((k / Math.floor(barCount / 2)) * Math.PI / 2.2);
+            let barHeight = (vol / 100) * maxBarHeight * factor;
+            if (vol > 0) {
+                // Add neat sine-wave movement for a live fluid wave look
+                barHeight += Math.sin(Date.now() / 120 + i) * 4;
+            }
+            barHeight = Math.max(3, barHeight);
+            
+            const x = startX + i * (barWidth + barGap);
+            const y = height - 26 - barHeight; // Grow upwards from the baseline
+            
+            if (typeof pipCtx.roundRect === 'function') {
+                pipCtx.beginPath();
+                pipCtx.roundRect(x, y, barWidth, barHeight, 3);
+                pipCtx.fill();
+            } else {
+                pipCtx.fillRect(x, y, barWidth, barHeight);
+            }
+        }
+        pipCtx.shadowBlur = 0; // Reset
+    }
+}
+
+function startPipLoop() {
+    if (pipAnimationId) return;
+    function render(time) {
+        if (!pipActive) {
+            pipAnimationId = null;
+            return;
+        }
+        pipAnimationId = requestAnimationFrame(render);
+        
+        // Throttle to ~30 FPS (33ms) to save CPU resources
+        if (time - lastPipRenderTime < 33) return;
+        lastPipRenderTime = time;
+        
+        updatePipCanvas();
+    }
+    pipAnimationId = requestAnimationFrame(render);
+}
+
+async function togglePIP(mode = 1) {
     try {
         if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture();
-            pipActive = false;
+            if (pipMode === mode) {
+                // Clicking same active mode exits PIP
+                await document.exitPictureInPicture();
+                pipActive = false;
+            } else {
+                // Instantly switch style without closing/reopening window!
+                pipMode = mode;
+                updatePipCanvas();
+            }
         } else {
+            pipMode = mode;
             pipActive = true;
-            updatePipCanvas();
+            startPipLoop();
             if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream();
             await pipVideo.play();
             await pipVideo.requestPictureInPicture();
@@ -1280,6 +1601,120 @@ async function translateCaptionChunk(text) {
     }
 }
 
+// Client-side prompt builder for local/direct API configurations
+function buildPromptClient(transcript, question, mode, options = {}) {
+    if (question) {
+        return `자막 내용:\n${transcript}\n\n질문:\n${question}\n\n위 자막 내용에 근거해서 한국어로 간결하고 정확하게 답변해 주세요.`;
+    }
+    if (mode === "minutes") {
+        return `다음 자막 내용을 강의 노트로 정리해 주세요.
+
+출력은 반드시 Markdown 형식으로 작성하고, 아래 구조를 유지해 주세요.
+
+# 강의 노트
+
+## 핵심 개념
+- 
+
+## 강의 흐름
+- 
+
+## 중요 설명
+- 확인된 내용이 없으면 "확인된 내용 없음"이라고 적어 주세요.
+
+## 복습할 내용
+- 담당자나 기한이 명확하지 않으면 추측하지 말고 "담당자 미정", "기한 미정"으로 적어 주세요.
+
+## 질문 또는 추가 확인
+- 
+
+규칙:
+- 자막에 없는 내용은 추측하지 마세요.
+- 반복되거나 잘못 인식된 표현은 자연스럽게 정리하세요.
+- 너무 길게 쓰지 말고 실무자가 바로 복사해 쓸 수 있게 작성하세요.
+
+자막 내용:
+${transcript}`;
+    }
+    return `다음 자막 내용을 한국어로 3줄 이내로 핵심 요약해 주세요.\n\n${transcript}`;
+}
+
+function generateHeuristicSummary(transcript) {
+    const sentences = transcript.split(/[.\n?!\r]/).map(s => s.trim()).filter(s => s.length > 5);
+    
+    // 1. 핵심 개념 매칭 (Core concepts)
+    const keyConceptKeywords = ["개념", "정의", "의미", "뜻은", "핵심", "중요", "기본", "원리", "구조"];
+    const keyConcepts = sentences.filter(s => keyConceptKeywords.some(kw => s.includes(kw))).slice(0, 5);
+    if (keyConcepts.length === 0) keyConcepts.push("자막 내용에서 뚜렷한 핵심 개념 문장을 식별하지 못했습니다.");
+
+    // 2. 강의 흐름 정리 (시간순 분할 요약)
+    const flowCount = Math.min(4, Math.max(2, Math.floor(sentences.length / 8)));
+    const flowSegments = [];
+    const chunkSize = Math.ceil(sentences.length / flowCount);
+    for (let i = 0; i < flowCount; i++) {
+        const chunk = sentences.slice(i * chunkSize, (i + 1) * chunkSize);
+        if (chunk.length > 0) {
+            flowSegments.push(chunk[0] + (chunk[1] ? " → " + chunk[1] : ""));
+        }
+    }
+    if (flowSegments.length === 0) flowSegments.push("자막 내용이 충분하지 않습니다.");
+
+    // 3. 중요 설명 매칭 (Highlights)
+    const importantKeywords = ["가장", "꼭", "반드시", "기억", "주의", "시험", "핵심은", "이유는", "왜냐하면", "결론"];
+    const importantNotes = sentences.filter(s => importantKeywords.some(kw => s.includes(kw))).slice(0, 5);
+    if (importantNotes.length === 0) importantNotes.push("확인된 강조 설명 문장이 없습니다.");
+
+    // 4. 복습할 내용 매칭 (Review pointers)
+    const reviewKeywords = ["복습", "다시", "정리", "요약", "과제", "숙제", "문제", "연습"];
+    const reviewItems = sentences.filter(s => reviewKeywords.some(kw => s.includes(kw))).slice(0, 4);
+    if (reviewItems.length === 0) reviewItems.push("명시적인 과제나 복습 권장 사항이 없습니다. 강의 노트를 다시 읽어보세요.");
+
+    // 5. 추가 확인 키워드 (Questions or doubts)
+    const questionKeywords = ["물음", "의문", "궁금", "질문", "확인", "의아", "이해", "헷갈"];
+    const questionItems = sentences.filter(s => questionKeywords.some(kw => s.includes(kw))).slice(0, 3);
+    if (questionItems.length === 0) questionItems.push("추가 확인이 필요한 특별한 모호점은 발견되지 않았습니다.");
+
+    return `# 강의 노트 (로컬 룰베이스 요약)
+
+## 핵심 개념
+${keyConcepts.map(s => `- ${s}`).join('\n')}
+
+## 강의 흐름
+${flowSegments.map(s => `- ${s}`).join('\n')}
+
+## 중요 설명
+${importantNotes.map(s => `- ${s}`).join('\n')}
+
+## 복습할 내용
+${reviewItems.map(s => `- ${s}`).join('\n')}
+
+## 질문 또는 추가 확인
+${questionItems.map(s => `- ${s}`).join('\n')}`;
+}
+
+function answerHeuristicQuestion(transcript, question) {
+    const sentences = transcript.split(/[.\n?!\r]/).map(s => s.trim()).filter(s => s.length > 5);
+    const keywords = question.split(' ').map(k => k.trim()).filter(k => k.length > 1);
+    
+    if (keywords.length === 0) return "질문에 명확한 단어가 포함되어 있지 않습니다.";
+    
+    // Find sentences matching question keywords
+    const matches = sentences.filter(s => keywords.some(kw => s.includes(kw)));
+    
+    if (matches.length > 0) {
+        return `**로컬 검색 답변 (문맥 탐색 결과):**
+자막 내용 중에서 질문과 관련된 문맥을 찾았습니다:
+
+${matches.slice(0, 4).map((s, idx) => `${idx + 1}. "... ${s} ..."`).join('\n\n')}
+
+*(참고: 현재 외부 AI API를 거치지 않고 자막 내 문맥을 탐색하는 로컬 룰베이스로 답변되었습니다. 더 똑똑한 자연어 처리를 원하시면 설정에서 API 제공자를 활성화해 주세요.)*`;
+    }
+    
+    return `**로컬 검색 답변 (검색 실패):**
+질문하신 키워드(\`${keywords.join(', ')}\`)를 포함한 명확한 자막 문맥을 자막 히스토리에서 찾지 못했습니다. 
+자막이 더 쌓인 후에 다시 질문해 보시거나, 설정에서 Gemini/OpenAI 같은 클라우드 엔진을 사용해 보세요!`;
+}
+
 async function callAI(question = null, mode = "summary") {
     const aiArea = document.getElementById('youtube-ai');
     if (!aiArea) return;
@@ -1292,6 +1727,9 @@ async function callAI(question = null, mode = "summary") {
 
     const aiSettings = getAiRequestSettings();
     const usesServerCredit = aiSettings.provider === 'default';
+    const isLocalAI = ['ollama', 'lmstudio'].includes(aiSettings.provider);
+    const isHeuristic = aiSettings.provider === 'local-heuristic';
+    const isKeyless = isLocalAI || isHeuristic;
 
     if (usesServerCredit && typeof currentUser !== 'undefined' && !currentUser) {
         openAuthModal(getAppLanguage() === 'ko' ? '강의자료 정리는 로그인 후 사용할 수 있습니다.' : 'AI summaries are available after logging in.');
@@ -1303,7 +1741,7 @@ async function callAI(question = null, mode = "summary") {
         return;
     }
 
-    if (!usesServerCredit && !aiSettings.apiKey) {
+    if (!usesServerCredit && !isKeyless && !aiSettings.apiKey) {
         alert(getAppLanguage() === 'ko' ? "개인 API 키를 설정창에 입력해 주세요." : "Please enter your personal API key in settings.");
         toggleAiSettings();
         return;
@@ -1360,35 +1798,88 @@ async function callAI(question = null, mode = "summary") {
     }
 
     try {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(typeof currentSession !== 'undefined' && currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
-            },
-            body: JSON.stringify({
-                text: transcript,
-                question: question || "",
-                mode: mode,
-                minutesType: "lecture",
-                provider: aiSettings.provider,
-                model: aiSettings.model,
-                apiKey: aiSettings.apiKey
-            })
-        });
-
-        const data = await res.json();
+        let resultText = "";
         
-        if (usesServerCredit && res.ok && typeof incrementUsage === 'function') {
-            incrementUsage('aiRequests', 1);
-            if (typeof renderPremiumState === 'function') renderPremiumState();
-        }
+        if (isHeuristic) {
+            // --- 로컬 오프라인 엔진 (룰베이스 요약 및 키워드 답변) ---
+            if (question) {
+                resultText = answerHeuristicQuestion(transcript, question);
+            } else {
+                resultText = generateHeuristicSummary(transcript);
+            }
+        } else if (isLocalAI) {
+            // --- 로컬 오프라인 AI 구동 (Ollama / LM Studio) ---
+            const endpoint = aiSettings.provider === 'ollama' 
+                ? "http://localhost:11434/v1/chat/completions" 
+                : "http://localhost:1234/v1/chat/completions";
+                
+            const prompt = buildPromptClient(transcript, question, mode, { minutesType: "lecture" });
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: AbortSignal.timeout(30000), // 30초 제한
+                    body: JSON.stringify({
+                        model: aiSettings.model,
+                        messages: [
+                            { role: "system", content: "너는 실시간 자막 내용을 정리하는 한국어 보조 도구다. 자막에 없는 내용은 추측하지 않는다." },
+                            { role: "user", content: prompt }
+                        ],
+                        temperature: 0.3
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`로컬 AI 서버 오류 (${response.status})`);
+                }
+                
+                const data = await response.json();
+                resultText = data.choices?.[0]?.message?.content;
+                if (!resultText) throw new Error("로컬 AI 응답 내용이 비어 있습니다.");
+                
+            } catch (err) {
+                let msg = err.message;
+                if (err.name === 'TimeoutError') {
+                    msg = "로컬 AI 답변 제한 시간을 초과했습니다. 모델이 아직 준비되지 않았거나 대기 중입니다.";
+                } else if (err.name === 'TypeError') {
+                    const localSrv = aiSettings.provider === 'ollama' ? 'Ollama' : 'LM Studio';
+                    msg = `${localSrv} 서버에 연결할 수 없습니다. 프로그램이 켜져 있고 CORS 허용(Ollama의 경우 OLLAMA_ORIGINS="*" 환경변수) 상태인지 확인하세요.`;
+                }
+                throw new Error(msg);
+            }
+        } else {
+            // --- 클라우드 AI 구동 (서버 크레딧 또는 개인 API 키) ---
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(typeof currentSession !== 'undefined' && currentSession?.access_token ? { Authorization: `Bearer ${currentSession.access_token}` } : {})
+                },
+                body: JSON.stringify({
+                    text: transcript,
+                    question: question || "",
+                    mode: mode,
+                    minutesType: "lecture",
+                    provider: aiSettings.provider,
+                    model: aiSettings.model,
+                    apiKey: aiSettings.apiKey
+                })
+            });
 
-        if (!res.ok) {
-            throw new Error(data.result || (getAppLanguage() === 'ko' ? "AI 요청 실패" : "AI Request Failed"));
-        }
+            const data = await res.json();
+            
+            if (usesServerCredit && res.ok && typeof incrementUsage === 'function') {
+                incrementUsage('aiRequests', 1);
+                if (typeof renderPremiumState === 'function') renderPremiumState();
+            }
 
-        const resultText = data.result || "";
+            if (!res.ok) {
+                throw new Error(data.result || (getAppLanguage() === 'ko' ? "AI 요청 실패" : "AI Request Failed"));
+            }
+
+            resultText = data.result || "";
+        }
         
         if (mode === "minutes") {
             localStorage.setItem('vlive_last_minutes', resultText);

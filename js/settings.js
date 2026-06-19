@@ -266,17 +266,57 @@ function toggleAiPersonalApiSettings(shouldSave = true) {
     updateAiSummary();
 }
 
-function updateAiModelOptions(preferredModel = "") {
+async function updateAiModelOptions(preferredModel = "") {
     const providerInput = document.getElementById('ai-provider');
     const modelInput = document.getElementById('ai-model');
     if (!providerInput || !modelInput) return;
-    const models = AI_PROVIDER_MODELS[providerInput.value] || AI_PROVIDER_MODELS.gemini;
+    
+    const provider = providerInput.value;
+    let models = AI_PROVIDER_MODELS[provider] || AI_PROVIDER_MODELS.gemini;
+    
+    // Clear the select first
+    modelInput.replaceChildren();
+    
+    // Try to dynamically load active models from local endpoints if running
+    if (provider === 'ollama') {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1200);
+            const res = await fetch('http://localhost:11434/api/tags', { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.models && data.models.length > 0) {
+                    models = data.models.map((m) => ({ value: m.name, label: m.name }));
+                }
+            }
+        } catch (e) {
+            console.log("Local Ollama not running or CORS blocked. Using defaults.");
+        }
+    } else if (provider === 'lmstudio') {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1200);
+            const res = await fetch('http://localhost:1234/v1/models', { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.data && data.data.length > 0) {
+                    models = data.data.map((m) => ({ value: m.id, label: m.id }));
+                }
+            }
+        } catch (e) {
+            console.log("Local LM Studio not running. Using defaults.");
+        }
+    }
+    
     modelInput.replaceChildren(...models.map((model) => {
         const option = document.createElement('option');
         option.value = model.value;
         option.textContent = model.label;
         return option;
     }));
+    
     const savedModel = preferredModel || localStorage.getItem('vlive_ai_model') || models[0].value;
     modelInput.value = models.some((model) => model.value === savedModel) ? savedModel : models[0].value;
     saveAiSettings();
@@ -290,7 +330,14 @@ function updateAiSummary() {
     if (!enabled) { summary.textContent = uiText('serverCredit'); return; }
     const provider = document.getElementById('ai-provider')?.value || 'gemini';
     const model = document.getElementById('ai-model')?.value || '';
-    summary.textContent = `내 ${provider.toUpperCase()} API 키 사용 중${model ? ` · ${model}` : ""}`;
+    if (['ollama', 'lmstudio'].includes(provider)) {
+        const provName = provider === 'ollama' ? 'Ollama (로컬)' : 'LM Studio (로컬)';
+        summary.textContent = `${provName} 사용 중${model ? ` · ${model}` : ""}`;
+    } else if (provider === 'local-heuristic') {
+        summary.textContent = `로컬 오프라인 엔진 (룰베이스 요약) 사용 중`;
+    } else {
+        summary.textContent = `내 ${provider.toUpperCase()} API 키 사용 중${model ? ` · ${model}` : ""}`;
+    }
 }
 
 function getMinutesType() {

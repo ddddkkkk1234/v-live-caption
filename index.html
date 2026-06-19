@@ -35,7 +35,6 @@
 </head>
 <body>
 
-    <div id="model-loading"><div id="model-loading-fill"></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <!-- 플로팅 라인 배경 컨테이너 -->
@@ -63,9 +62,9 @@
                     <option value="en">English</option>
                     <option value="ko" selected>Korean</option>
                 </select>
-                <!-- 초미니멀리즘 프로필 아이콘 -->
-                <button type="button" onclick="openMyPage()" id="profile-btn" class="profile-icon-btn minimalist-profile" aria-label="마이페이지">
-                    <span style="color: #00B0FF; font-size: 1.4rem;">👤</span>
+                <!-- 마이페이지 / 로그인 버튼 -->
+                <button type="button" onclick="openMyPage()" id="mypage-btn" class="btn-pip-avatar" style="margin-left: 1rem;" title="로그인" data-tier="guest">
+                    <img src="avatar_3d_guest.jpg" alt="Avatar" class="mypage-avatar-3d">
                 </button>
             </div>
         </div>
@@ -89,7 +88,6 @@
                         <div class="selector-inline">
                             <select id="engine-select" onchange="updateEngineSettingsVisibility()">
                                 <option value="browser-speech" selected>일반 (웹 표준)</option>
-                                <option value="local-whisper">내 기기</option>
                                 <option value="groq">클라우드</option>
                             </select>
                             <button onclick="toggleSettingsPanel()" id="settings-toggle" class="btn btn-pip">⚙️</button>
@@ -178,7 +176,8 @@
                         </div>
                         <div class="header-actions">
                             <button onclick="toggleFocusMode()" id="focus-mode-btn" class="btn btn-pip">크게</button>
-                            <button onclick="togglePIP()" class="btn btn-pip">PIP</button>
+                            <button onclick="togglePIP(1)" class="btn btn-pip">PIP 1</button>
+                            <button onclick="togglePIP(2)" class="btn btn-pip">PIP 2</button>
                             <button onclick="clearTranscript()" class="btn btn-pip">비우기</button>
                         </div>
                     </div>
@@ -196,7 +195,7 @@
                         <div id="ai-settings-panel" class="ai-settings collapsed">
                             <div class="selector-box">
                                 <label class="checkbox-row"><input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()"><span>내 API 키</span></label>
-                                <div class="selector-item ai-key-item"><label>업체</label><select id="ai-provider" onchange="updateAiModelOptions()"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></div>
+                                <div class="selector-item ai-key-item"><label>업체</label><select id="ai-provider" onchange="updateAiModelOptions()"><option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="groq">Groq</option><option value="ollama">Ollama (로컬)</option><option value="lmstudio">LM Studio (로컬)</option><option value="local-heuristic">로컬 무필요 API (룰베이스)</option></select></div>
                                 <div class="selector-item ai-key-item"><label>모델</label><select id="ai-model" onchange="saveAiSettings()"></select></div>
                                 <div class="selector-item ai-key-item"><label>키</label><input type="password" id="ai-api-key" class="custom-input" oninput="saveAiSettings()"></div>
                                 <div class="api-helper-links">
@@ -257,6 +256,9 @@
         <div id="auth-modal" class="modal-overlay" onclick="closeAuthModal()">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <button class="modal-close" onclick="closeAuthModal()">✕</button>
+                <div style="text-align: center; display: flex; justify-content: center; align-items: center; margin-bottom: 20px;">
+                    <img src="login_3d_key.jpg" alt="Login Key" class="floating-3d-image">
+                </div>
                 <h2>로그인 / 회원가입</h2>
                 <p id="auth-modal-note" class="modal-desc">Premium 기능을 계정에 연결하려면 먼저 로그인하세요.</p>
                 
@@ -317,7 +319,7 @@
                         <h3 style="margin-top: 0; color: #fff;">Free</h3>
                         <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin: 10px 0;">₩0 <span style="font-size: 0.9rem; font-weight: normal; color: rgba(255,255,255,0.4);">/ 평생 무료</span></div>
                         <ul style="padding-left: 18px; margin: 15px 0; font-size: 0.85rem; color: rgba(255,255,255,0.6); display: flex; flex-direction: column; gap: 8px; flex: 1;">
-                            <li>내 기기 기반 실시간 자막</li>
+                            <li>기본(웹 표준) 실시간 자막</li>
                             <li>텍스트(TXT) 파일 내보내기</li>
                             <li>AI 강의노트 일일 3회 제한</li>
                             <li>클라우드 자막 일일 10분 제한</li>

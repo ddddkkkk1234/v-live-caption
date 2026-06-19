@@ -422,5 +422,17 @@ const AI_PROVIDER_MODELS = {
     groq: [
         { value: "llama-3.1-8b-instant", label: "llama-3.1-8b-instant" },
         { value: "llama-3.3-70b-versatile", label: "llama-3.3-70b-versatile" }
+    ],
+    ollama: [
+        { value: "llama3:latest", label: "llama3:latest" },
+        { value: "gemma2:latest", label: "gemma2:latest" },
+        { value: "qwen2.5:latest", label: "qwen2.5:latest" },
+        { value: "phi3:latest", label: "phi3:latest" }
+    ],
+    lmstudio: [
+        { value: "local-model", label: "로드된 로컬 모델" }
+    ],
+    "local-heuristic": [
+        { value: "rule-base", label: "로컬 오프라인 엔진 (룰베이스)" }
     ]
 };

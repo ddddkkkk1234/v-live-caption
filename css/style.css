@@ -788,3 +788,218 @@ footer {
     color: rgba(255, 255, 255, 0.15);
     user-select: none;
 }
+
+/* ==========================================================================
+   자막 오버레이 모드 (Caption Focus / Horizontal Strip Mode)
+   ========================================================================== */
+body.caption-focus {
+    background: #050508 !important;
+}
+
+/* 화면 최소화를 위해 헤더, 푸터, AI카드, 배경 파티클, 설정 컬럼 등을 숨김 */
+body.caption-focus .dashboard-header,
+body.caption-focus footer,
+body.caption-focus .premium-card,
+body.caption-focus .ai-card,
+body.caption-focus #floating-background,
+body.caption-focus .settings-col {
+    display: none !important;
+}
+
+/* 그리드를 1열로 축소하고 전체 화면을 채움 */
+body.caption-focus .content-grid {
+    grid-template-columns: 1fr !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+/* 자막 카드가 브라우저 창 전체를 채우도록 설정 (배경색/투명도는 설정 슬라이더와 실시간 연동) */
+body.caption-focus .transcript-card {
+    height: 100% !important;
+    width: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0.5rem 1.5rem !important;
+    background: var(--caption-bg, rgba(20, 20, 20, 0.45)) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    justify-content: center;
+    position: relative;
+}
+
+/* 오버레이 상태에서 조작 버튼(원래대로, PIP, 비우기 등)은 우측 상단에 작게 배치하고,
+   마우스 오버시에만 투명도를 밝혀서 자막 감상 시 집중도를 해치지 않음 */
+body.caption-focus .transcript-card .card-header {
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    position: absolute;
+    top: 8px;
+    right: 15px;
+    z-index: 100;
+    opacity: 0.15;
+    transition: opacity 0.25s ease;
+    background: transparent !important;
+}
+body.caption-focus .transcript-card:hover .card-header {
+    opacity: 1;
+}
+
+/* 헤더 제목("📺 수업명 입력" 등)은 오버레이 모드에서 제거 */
+body.caption-focus .transcript-card .card-header .header-title-group {
+    display: none !important;
+}
+
+/* 스크롤 영역을 세로/가로로 완벽히 정렬하고 스크롤바를 보이지 않게 처리 */
+body.caption-focus .transcript-card .scroll-area {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100% !important;
+    padding: 1.5rem 0 !important;
+    overflow-y: auto;
+    scrollbar-width: none !important; /* Firefox용 */
+}
+body.caption-focus .transcript-card .scroll-area::-webkit-scrollbar {
+    display: none !important; /* Chrome, Edge용 */
+}
+
+/* 자막 텍스트의 크기와 대비를 높여 다양한 화면 위에서 명확하게 보이도록 최적화 */
+body.caption-focus #youtube-text {
+    width: 100%;
+    text-align: center;
+    font-size: calc(var(--caption-size, 1.4rem) * 1.25) !important;
+    color: var(--caption-color, #FFEB3B) !important;
+    background: transparent !important;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.95);
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+body.caption-focus #interim-text {
+    width: 100%;
+    text-align: center;
+    font-size: calc(var(--caption-size, 1.4rem) * 1.25) !important;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.95);
+    font-weight: 500;
+    line-height: 1.6;
+}
+
+/* ==========================================================================
+   로그인 모달 3D 및 네온 비주얼 효과
+   ========================================================================== */
+#auth-modal .modal-content {
+    background: linear-gradient(135deg, #141416 0%, #1c1c22 100%);
+    border: 1px solid rgba(0, 176, 255, 0.25);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 176, 255, 0.08);
+}
+
+.floating-3d-image {
+    width: 130px;
+    height: 130px;
+    border-radius: 24px;
+    box-shadow: 0 12px 35px rgba(0, 176, 255, 0.3);
+    animation: float3D 6s ease-in-out infinite;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    object-fit: cover;
+    margin-bottom: 5px;
+    background: radial-gradient(circle, rgba(0, 176, 255, 0.2) 0%, transparent 70%);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease;
+}
+
+.floating-3d-image:hover {
+    transform: scale(1.08) rotate(5deg) translateY(-5px);
+    box-shadow: 0 20px 45px rgba(0, 176, 255, 0.55);
+}
+
+@keyframes float3D {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-12px) rotate(3deg);
+    }
+    100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+}
+
+/* 네비게이션 로그인 버튼 3D 아바타 스타일 */
+.btn-pip-avatar {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    outline: none;
+    transition: transform 0.3s ease;
+}
+
+.mypage-avatar-3d {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+/* --- TIER SPECIFIC STYLES --- */
+
+/* Guest (로그아웃 / 비회원) */
+.btn-pip-avatar[data-tier="guest"] .mypage-avatar-3d {
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+}
+.btn-pip-avatar[data-tier="guest"]:hover .mypage-avatar-3d {
+    transform: scale(1.1) rotate(8deg);
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.35), 0 0 0 6px rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.75);
+}
+
+/* Free (일반 로그인 회원) */
+.btn-pip-avatar[data-tier="free"] .mypage-avatar-3d {
+    border: 3px solid rgba(0, 176, 255, 0.4);
+    box-shadow: 0 0 18px rgba(0, 176, 255, 0.3);
+}
+.btn-pip-avatar[data-tier="free"]:hover .mypage-avatar-3d {
+    transform: scale(1.1) rotate(8deg);
+    box-shadow: 0 0 30px rgba(0, 176, 255, 0.75), 0 0 0 6px rgba(0, 176, 255, 0.15);
+    border-color: rgba(0, 176, 255, 0.95);
+}
+
+/* Premium (개인 프리미엄 회원 - 골드 컨셉) */
+.btn-pip-avatar[data-tier="premium"] .mypage-avatar-3d {
+    border: 3px solid rgba(255, 215, 0, 0.6);
+    box-shadow: 0 0 22px rgba(255, 215, 0, 0.35);
+}
+.btn-pip-avatar[data-tier="premium"]:hover .mypage-avatar-3d {
+    transform: scale(1.1) rotate(8deg);
+    box-shadow: 0 0 35px rgba(255, 215, 0, 0.8), 0 0 0 6px rgba(255, 215, 0, 0.18);
+    border-color: rgba(255, 215, 0, 0.95);
+}
+
+/* Team (팀/워크그룹 회원 - 바이올렛/마젠타 컨셉) */
+.btn-pip-avatar[data-tier="team"] .mypage-avatar-3d {
+    border: 3px solid rgba(224, 64, 251, 0.6);
+    box-shadow: 0 0 22px rgba(224, 64, 251, 0.35);
+}
+.btn-pip-avatar[data-tier="team"]:hover .mypage-avatar-3d {
+    transform: scale(1.1) rotate(8deg);
+    box-shadow: 0 0 35px rgba(224, 64, 251, 0.8), 0 0 0 6px rgba(224, 64, 251, 0.18);
+    border-color: rgba(224, 64, 251, 0.95);
+}
+
+.btn-pip-avatar:active .mypage-avatar-3d {
+    transform: scale(0.95);
+}
+
+

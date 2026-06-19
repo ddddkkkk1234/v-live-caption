@@ -79,7 +79,36 @@ function renderAuthState(message = "") {
             : (message || authConfigError || "Premium 기능을 사용하려면 로그인하세요.");
     }
     if (premiumBtn) premiumBtn.textContent = "Premium";
-    if (mypageBtn) mypageBtn.textContent = currentUser ? uiText('myPage') : uiText('login');
+    if (mypageBtn) {
+        const textSpan = mypageBtn.querySelector('.btn-text');
+        const buttonLabel = currentUser ? uiText('myPage') : uiText('login');
+        if (textSpan) {
+            textSpan.textContent = buttonLabel;
+        }
+        mypageBtn.title = buttonLabel;
+        mypageBtn.setAttribute('aria-label', buttonLabel);
+
+        const avatarImg = mypageBtn.querySelector('.mypage-avatar-3d');
+        if (avatarImg) {
+            let src = "avatar_3d_guest.jpg";
+            let tier = "guest";
+            if (currentUser) {
+                const plan = getPlan();
+                if (plan === 'premium') {
+                    src = "avatar_3d_vip.jpg";
+                    tier = "premium";
+                } else if (plan === 'team') {
+                    src = "avatar_3d_team.jpg";
+                    tier = "team";
+                } else {
+                    src = "user_3d_avatar.jpg";
+                    tier = "free";
+                }
+            }
+            avatarImg.src = src;
+            mypageBtn.dataset.tier = tier;
+        }
+    }
     renderAccountPanel();
 }
 
