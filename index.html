@@ -195,7 +195,7 @@
                         <div id="ai-settings-panel" class="ai-settings collapsed">
                             <div class="selector-box">
                                 <label class="checkbox-row"><input type="checkbox" id="ai-personal-api-enabled" onchange="toggleAiPersonalApiSettings()"><span>내 API 키</span></label>
-                                <div class="selector-item ai-key-item"><label>업체</label><select id="ai-provider" onchange="updateAiModelOptions()"><option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="groq">Groq</option><option value="ollama">Ollama (로컬)</option><option value="lmstudio">LM Studio (로컬)</option><option value="local-heuristic">로컬 무필요 API (룰베이스)</option></select></div>
+                                <div class="selector-item ai-key-item"><label>업체</label><select id="ai-provider" onchange="updateAiModelOptions()"><option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="groq">Groq</option><option value="chrome-built-in">Chrome Gemini Nano (로컬)</option><option value="ollama">Ollama (로컬)</option><option value="lmstudio">LM Studio (로컬)</option><option value="local-heuristic">로컬 무필요 API (룰베이스)</option></select></div>
                                 <div class="selector-item ai-key-item"><label>모델</label><select id="ai-model" onchange="saveAiSettings()"></select></div>
                                 <div class="selector-item ai-key-item"><label>키</label><input type="password" id="ai-api-key" class="custom-input" oninput="saveAiSettings()"></div>
                                 <div class="api-helper-links">
@@ -423,6 +423,20 @@
     <script>
         window.addEventListener('DOMContentLoaded', async () => {
             try {
+                // 0. 스크롤 감지 및 상단바 스타일 전환
+                const topbar = document.querySelector('.topbar');
+                if (topbar) {
+                    const checkScroll = () => {
+                        if (window.scrollY > 10) {
+                            topbar.classList.add('scrolled');
+                        } else {
+                            topbar.classList.remove('scrolled');
+                        }
+                    };
+                    window.addEventListener('scroll', checkScroll);
+                    checkScroll(); // 초기 상태 체크
+                }
+
                 // 1. 기초 UI 및 언어 설정
                 if (typeof initLanguageControls === 'function') initLanguageControls();
                 

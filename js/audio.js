@@ -1807,6 +1807,38 @@ async function callAI(question = null, mode = "summary") {
             } else {
                 resultText = generateHeuristicSummary(transcript);
             }
+        } else if (aiSettings.provider === 'chrome-built-in') {
+            // --- 크롬 브라우저 내장 Gemini Nano ---
+            if (!window.ai || !window.ai.languageModel) {
+                throw new Error("이 브라우저에서 Chrome 내장 AI(Gemini Nano)를 지원하지 않거나 설정이 꺼져 있습니다.<br><br>" +
+                                "<b>[활성화 방법]</b><br>" +
+                                "1. 크롬 주소창에 <code style='background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;'>chrome://flags</code> 입력 후 접속<br>" +
+                                "2. <b>Prompt API for Gemini Nano</b> ➡️ <b>Enabled</b> 설정<br>" +
+                                "3. <b>Enables optimization guide on device</b> ➡️ <b>Enabled Control (또는 Enabled)</b> 설정<br>" +
+                                "4. 크롬 브라우저 종료 후 완전히 다시 시작(Relaunch) 하세요.");
+            }
+            
+            const capabilities = await window.ai.languageModel.capabilities();
+            if (capabilities.available === 'no') {
+                throw new Error("Gemini Nano 모델을 현재 시스템에서 사용할 수 없습니다. 브라우저 사양 또는 디스크 공간을 확인해 주세요.");
+            }
+            
+            const prompt = buildPromptClient(transcript, question, mode, { minutesType: "lecture" });
+            showToast("Chrome 내장 AI(Gemini Nano)가 로컬 연산을 시작합니다...");
+            
+            let session = null;
+            try {
+                session = await window.ai.languageModel.create({
+                    systemPrompt: "너는 실시간 자막 내용을 정리하는 한국어 보조 도구다. 자막에 제공된 내용에 충실하게 강의노트를 요약하거나 답변을 작성해라."
+                });
+                resultText = await session.prompt(prompt);
+            } catch (err) {
+                throw new Error("Gemini Nano 답변 생성 중 오류가 발생했습니다: " + err.message);
+            } finally {
+                if (session) {
+                    session.destroy();
+                }
+            }
         } else if (isLocalAI) {
             // --- 로컬 오프라인 AI 구동 (Ollama / LM Studio) ---
             const endpoint = aiSettings.provider === 'ollama' 

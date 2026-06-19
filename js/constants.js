@@ -432,6 +432,9 @@ const AI_PROVIDER_MODELS = {
     lmstudio: [
         { value: "local-model", label: "로드된 로컬 모델" }
     ],
+    "chrome-built-in": [
+        { value: "gemini-nano", label: "Chrome Gemini Nano (내장 AI)" }
+    ],
     "local-heuristic": [
         { value: "rule-base", label: "로컬 오프라인 엔진 (룰베이스)" }
     ]
