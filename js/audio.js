@@ -171,11 +171,16 @@ function startBrowserSpeech(lang) {
 
     browserSpeechRecognition.onend = () => {
         if (isProRunning && browserSpeechRecognition) {
-            try {
-                browserSpeechRecognition.start();
-            } catch (e) {
-                console.error("브라우저 자막 재시작 실패:", e);
-            }
+            setTimeout(function restart() {
+                if (isProRunning && browserSpeechRecognition) {
+                    try {
+                        browserSpeechRecognition.start();
+                    } catch (e) {
+                        console.warn("브라우저 자막 재시작 대기 중...", e);
+                        setTimeout(restart, 300);
+                    }
+                }
+            }, 100);
         }
     };
 

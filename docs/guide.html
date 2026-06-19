@@ -132,8 +132,19 @@
             <p>로컬 자막 모드를 사용하면 음성 데이터가 브라우저 밖으로 나가지 않습니다. 클라우드 모드, AI 요약, 공유 보기 사용 시에는 기능 처리를 위해 데이터가 외부 API로 전송될 수 있습니다.</p>
             <h3>자막이 저장되는 위치와 기록 관리 방법</h3>
             <p>생성된 자막은 사용자의 브라우저 내 지난 자막 탭에 자동으로 보관됩니다. 이는 기기 내부의 localStorage를 사용하므로, 브라우저 데이터를 삭제하면 함께 지워질 수 있습니다.</p>
-            <h3>유튜브나 화상회의 소리도 자막으로 볼 수 있나요?</h3>
-            <p>PC 환경에서 시스템 오디오 입력 장치를 선택하면 컴퓨터에서 나오는 소리를 실시간 자막으로 변환할 수 있습니다. 기기와 브라우저 설정에 따라 지원 여부가 달라질 수 있습니다.</p>
+            <h3>유튜브나 화상회의 소리도 자막으로 볼 수 있나요? (인터넷 소리 + 블루투스 이어폰/보청기 동시 설정 방법)</h3>
+            <p>네, PC 환경에서 가상 오디오 케이블(VB-Cable)을 사용하면 컴퓨터에서 나오는 유튜브, 인강, Zoom 등의 소리를 실시간 자막으로 만들 수 있습니다. <strong>특히 블루투스 헤드폰이나 보청기를 착용하신 분들은 다음 설정을 완료하셔야 귀로 소리도 들리고 화면에는 자막도 정상적으로 생성됩니다.</strong></p>
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 12px 0;">
+                <strong style="color: var(--text);">윈도우 소리 설정 가이드 (1분 완성)</strong>
+                <ol style="margin: 8px 0; padding-left: 20px; color: var(--muted); line-height: 1.8;">
+                    <li><strong>기본 재생 장치 설정:</strong> 윈도우 우측 하단 스피커 아이콘을 클릭하고 출력 장치를 <code>CABLE Input (VB-Audio Virtual Cable)</code>으로 설정합니다. *(이때 잠시 소리가 안 들려도 정상입니다.)*</li>
+                    <li><strong>제어판 소리 메뉴 열기:</strong> 키보드 <code>윈도우 키</code> 누른 후 <code>제어판</code>을 검색하여 실행한 뒤 <strong>하드웨어 및 소리 ➡️ 소리</strong> 메뉴로 이동합니다.</li>
+                    <li><strong>녹음 탭 설정:</strong> 상단의 <strong>녹음</strong> 탭에서 <code>CABLE Output</code>을 마우스 우클릭한 후 <strong>속성</strong>을 누릅니다.</li>
+                    <li><strong>이 장치로 듣기 체크:</strong> <strong>수신 대기</strong> 탭으로 이동하여 <code>이 장치로 듣기</code>에 <strong>체크(V)</strong>합니다.</li>
+                    <li><strong>보청기/헤드폰 출력 연결:</strong> 바로 아래의 '이 장치로 재생' 드롭다운 메뉴에서 본인의 블루투스 보청기 또는 이어폰(<code>Hearing Aid / Bluetooth Headset</code>)을 선택하고 <strong>적용</strong>과 <strong>확인</strong>을 누릅니다.</li>
+                    <li><strong>LiveNote 앱 설정:</strong> LiveNote 화면에서 <strong>마이크 (입력)</strong>을 <code>CABLE Output (VB-Audio Virtual Cable)</code>으로 선택하고 <strong>시작</strong> 버튼을 누르면 끝입니다!</li>
+                </ol>
+            </div>
             <h3>공유 보기 기능은 어떤 상황에서 쓰이나요?</h3>
             <p>강연자가 휴대폰으로 마이크 입력을 하고, 청중이 각자의 태블릿이나 노트북에서 자막을 확인하고 싶을 때 유용한 보조 기능입니다.</p>
             <h3>지원하는 브라우저와 기기 사양이 궁금합니다.</h3>
