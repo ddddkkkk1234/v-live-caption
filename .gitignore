@@ -1,3 +1,6 @@
 # 현재 있는 폴더 중 제외
 .vscode/
 백업/
+.dev.vars
+.wrangler/
+

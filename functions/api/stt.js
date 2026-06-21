@@ -83,15 +83,17 @@ const getProviderConfig = (providerName) => {
   return config ? { provider: providerName, config } : null;
 };
 
-const resolveApiKey = (provider, formData, env) => {
+const resolveApiKey = (provider, formData, env, usesServerCredit) => {
   const userKey = cleanString(formData.get("apiKey"));
   if (userKey) return userKey;
-  if (provider === "groq") return cleanString(env.GROQ_API_KEY);
-  if (provider === "openai") return cleanString(env.OPENAI_API_KEY);
-  if (provider === "gladia") return cleanString(env.GLADIA_API_KEY);
-  if (provider === "speechmatics") return cleanString(env.SPEECHMATICS_API_KEY);
-  if (provider === "ibm") return cleanString(env.IBM_STT_API_KEY);
-  if (provider === "azure") return cleanString(env.AZURE_SPEECH_KEY);
+  if (usesServerCredit) {
+    if (provider === "groq") return cleanString(env.GROQ_API_KEY);
+    if (provider === "openai") return cleanString(env.OPENAI_API_KEY);
+    if (provider === "gladia") return cleanString(env.GLADIA_API_KEY);
+    if (provider === "speechmatics") return cleanString(env.SPEECHMATICS_API_KEY);
+    if (provider === "ibm") return cleanString(env.IBM_STT_API_KEY);
+    if (provider === "azure") return cleanString(env.AZURE_SPEECH_KEY);
+  }
   return "";
 };
 
@@ -348,7 +350,7 @@ export async function onRequestPost(context) {
         limits: quota.limits,
       }, 402, headers);
     }
-    const apiKey = resolveApiKey(provider, formData, env);
+    const apiKey = resolveApiKey(provider, formData, env, usesServerCredit);
     if (!apiKey) {
       return jsonResponse({ error: "음성 인식 API 키가 설정되지 않았습니다." }, 503, headers);
     }

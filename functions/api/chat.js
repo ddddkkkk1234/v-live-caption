@@ -44,12 +44,14 @@ const getProviderConfig = (providerName) => {
   return config ? { provider: providerName, config } : null;
 };
 
-const resolveApiKey = (provider, body, env) => {
+const resolveApiKey = (provider, body, env, usesServerCredit) => {
   const userKey = cleanString(body.apiKey);
   if (userKey) return userKey;
-  if (provider === "gemini") return cleanString(env.GEMINI_API_KEY || env.GOOGLE_AI_KEY);
-  if (provider === "openai") return cleanString(env.OPENAI_API_KEY);
-  if (provider === "groq") return cleanString(env.GROQ_API_KEY);
+  if (usesServerCredit) {
+    if (provider === "gemini") return cleanString(env.GEMINI_API_KEY || env.GOOGLE_AI_KEY);
+    if (provider === "openai") return cleanString(env.OPENAI_API_KEY);
+    if (provider === "groq") return cleanString(env.GROQ_API_KEY);
+  }
   return "";
 };
 
@@ -247,7 +249,7 @@ export async function onRequestPost(context) {
         limits: quota.limits,
       }, 402, headers);
     }
-    const apiKey = resolveApiKey(provider, body, env);
+    const apiKey = resolveApiKey(provider, body, env, usesServerCredit);
     if (!apiKey) {
       return jsonResponse({ result: "AI API 키가 설정되지 않았습니다." }, 503, headers);
     }

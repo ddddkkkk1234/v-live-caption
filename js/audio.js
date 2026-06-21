@@ -1399,7 +1399,7 @@ function downloadSmartMinutesPdf() {
     element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     
     element.innerHTML = `
-        <h1 style="font-size: 24px; margin: 0 0 6px; border-bottom: 2px solid #00E676; padding-bottom: 10px;">${lessonTitle}</h1>
+        <h1 style="font-size: 24px; margin: 0 0 6px; border-bottom: 2px solid #00E676; padding-bottom: 10px;">${escapeHtml(lessonTitle)}</h1>
         <div style="color: #6b7280; font-size: 13px; margin-bottom: 24px; margin-top: 10px;">생성일: ${stamp} · LiveNote Professional PDF</div>
         <div style="white-space: pre-wrap; word-break: keep-all; font-size: 14px; line-height: 1.7;">${escapeHtml(text)}</div>
     `;
@@ -1899,7 +1899,13 @@ async function callAI(question = null, mode = "summary") {
                 })
             });
 
-            const data = await res.json();
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (jsonErr) {
+                const errorText = await res.text().catch(() => "");
+                throw new Error(errorText || `서버 응답 오류 (HTTP ${res.status})`);
+            }
             
             if (usesServerCredit && res.ok && typeof incrementUsage === 'function') {
                 incrementUsage('aiRequests', 1);

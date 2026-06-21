@@ -46,15 +46,6 @@ async function getPublicConfig() {
 // ── 인증 상태 ─────────────────────────────────────────────
 
 async function initAuthState() {
-    // If not explicitly logged out, start as premium demo user by default for live preview
-    if (!localStorage.getItem('vlive_logged_out') && !currentUser) {
-        localStorage.setItem(PLAN_KEY, 'premium');
-        currentUser = {
-            id: "local-vip",
-            email: "premium-user@livecaption.com"
-        };
-    }
-    
     renderAuthState();
     try {
         const client = await ensureSupabaseClient();
@@ -84,18 +75,6 @@ async function initAuthState() {
     }
 }
 
-function loginAsMockPremium() {
-    localStorage.removeItem('vlive_logged_out');
-    localStorage.setItem(PLAN_KEY, 'premium');
-    currentUser = {
-        id: "local-vip",
-        email: "premium-user@livecaption.com"
-    };
-    renderAuthState();
-    renderPremiumState();
-    closeAuthModal();
-    showToast("Premium 데모 권한이 활성화되었습니다! 👑");
-}
 
 function renderAuthState(message = "") {
     const authStatus = document.getElementById('auth-status');
@@ -174,23 +153,6 @@ async function signInWithGoogle() {
     }
 }
 
-async function sendMagicLink() {
-    const emailInput = document.getElementById('auth-email');
-    const email = emailInput?.value.trim();
-    if (!email) { showToast("이메일을 입력해 주세요.", "error"); return; }
-    try {
-        const client = await ensureSupabaseClient();
-        const { error } = await client.auth.signInWithOtp({
-            email,
-            options: { emailRedirectTo: window.location.href }
-        });
-        if (error) throw error;
-        showToast("로그인 링크를 이메일로 보냈습니다.");
-    } catch (e) {
-        renderAuthState(e.message || "Email login failed.");
-        showToast("이메일 로그인 설정을 확인해 주세요.", "error", 5200);
-    }
-}
 
 async function signOut() {
     try {
@@ -344,6 +306,7 @@ async function startCheckout(plan = "premium") {
         if (paymentUrl) {
             const url = new URL(paymentUrl, window.location.href);
             url.searchParams.set("email", currentUser.email || "");
+            url.searchParams.set("client_reference_id", `${currentUser.id}:${plan}`);
             url.searchParams.set("plan", plan);
             window.location.href = url.toString();
             return;

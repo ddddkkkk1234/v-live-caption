@@ -21,14 +21,54 @@ function initLanguageControls() {
     const selector = document.getElementById('lang-select');
     const urlLang = new URLSearchParams(window.location.search).get('lang');
     const saved = ['en', 'ko', 'ja'].includes(urlLang) ? urlLang : (localStorage.getItem(UI_LANGUAGE_KEY) || 'en');
+    
+    const currentPath = window.location.pathname;
+    const isOnEnPage = currentPath.endsWith('index_en.html');
+    const isOnKoPage = currentPath.endsWith('index.html') || (!currentPath.endsWith('index_en.html') && !currentPath.endsWith('.html'));
+
+    if (saved === 'en' && !isOnEnPage) {
+        const url = new URL(currentPath.replace(/index\.html$/, '') + 'index_en.html', window.location.href);
+        for (const [k, v] of new URLSearchParams(window.location.search)) {
+            if (k !== 'lang') url.searchParams.set(k, v);
+        }
+        url.searchParams.set('lang', 'en');
+        window.location.href = url.toString();
+        return;
+    } else if (saved === 'ko' && !isOnKoPage) {
+        const url = new URL(currentPath.replace(/index_en\.html$/, '') + 'index.html', window.location.href);
+        for (const [k, v] of new URLSearchParams(window.location.search)) {
+            if (k !== 'lang') url.searchParams.set(k, v);
+        }
+        url.searchParams.set('lang', 'ko');
+        window.location.href = url.toString();
+        return;
+    }
+
     if (selector) {
-        selector.value = ['en', 'ko', 'ja'].includes(saved) ? saved : 'en';
+        selector.value = saved;
         selector.addEventListener('change', () => {
-            localStorage.setItem(UI_LANGUAGE_KEY, selector.value || 'en');
-            applyUiLanguage();
-            renderPremiumState();
-            renderAuthState();
-            renderHistory();
+            const targetLang = selector.value || 'en';
+            localStorage.setItem(UI_LANGUAGE_KEY, targetLang);
+            if (targetLang === 'en' && !isOnEnPage) {
+                const url = new URL(currentPath.replace(/index\.html$/, '') + 'index_en.html', window.location.href);
+                for (const [k, v] of new URLSearchParams(window.location.search)) {
+                    if (k !== 'lang') url.searchParams.set(k, v);
+                }
+                url.searchParams.set('lang', 'en');
+                window.location.href = url.toString();
+            } else if (targetLang === 'ko' && !isOnKoPage) {
+                const url = new URL(currentPath.replace(/index_en\.html$/, '') + 'index.html', window.location.href);
+                for (const [k, v] of new URLSearchParams(window.location.search)) {
+                    if (k !== 'lang') url.searchParams.set(k, v);
+                }
+                url.searchParams.set('lang', 'ko');
+                window.location.href = url.toString();
+            } else {
+                applyUiLanguage();
+                renderPremiumState();
+                renderAuthState();
+                renderHistory();
+            }
         });
     }
     applyUiLanguage();
@@ -55,6 +95,13 @@ function applyUiLanguage() {
     const lang = getAppLanguage();
     const dict = UI_TEXT[lang] || UI_TEXT.en;
     document.documentElement.lang = lang;
+
+    // Update guide link dynamically based on language
+    const guideLink = document.querySelector('a[href*="guide.html"], a[href*="guide_en.html"]');
+    if (guideLink) {
+        guideLink.href = lang === 'en' ? 'docs/guide_en.html' : 'docs/guide.html';
+    }
+
     document.querySelectorAll('body *').forEach((el) => {
         if (['SCRIPT', 'STYLE', 'OPTION'].includes(el.tagName)) return;
         el.childNodes.forEach((node) => {
