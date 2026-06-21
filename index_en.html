@@ -122,6 +122,7 @@
                         </div>
                     </div>
                     <div class="share-links">
+                        <button onclick="generateNewRoomId()" class="btn-text-only">New ID</button>
                         <button onclick="copyShareLink()" class="btn-text-only">Copy Link</button>
                         <button onclick="openShareModal()" class="btn-text-only">View QR</button>
                     </div>
@@ -259,6 +260,7 @@
                         <button onclick="copyShareLinkFromModal()" class="btn-copy-main">Copy Link</button>
                     </div>
                     <p class="modal-hint">Students will see captions immediately when they scan with their smartphone camera.</p>
+                    <p class="modal-hint" style="color: #ff5252; margin-top: 10px; font-size: 11.5px; opacity: 0.9; line-height: 1.4;">⚠️ <strong>Security & Privacy Warning:</strong> During live caption sharing, spoken dialogue is visible to anyone using the public share link. Please refrain from sharing sensitive or personal conversations.</p>
                 </div>
             </div>
         </div>
@@ -438,6 +440,9 @@
 
                 // 1. Initial UI and Language settings
                 if (typeof initLanguageControls === 'function') initLanguageControls();
+                
+                // *. Initialize Room ID
+                if (typeof initRoomId === 'function') initRoomId();
                 
                 // 2. Auth state initialization
                 if (typeof initAuthState === 'function') await initAuthState();

@@ -456,7 +456,10 @@ function getShareUrl() {
 }
 
 function updateShareLink() {
-    // Optional dynamic UI updates when typing the room id
+    const roomIdInput = document.getElementById('room-id');
+    if (roomIdInput) {
+        localStorage.setItem('vlive_room_id', roomIdInput.value.trim());
+    }
 }
 
 async function copyShareLink() {
@@ -636,6 +639,34 @@ async function checkStudentShareConnection() {
         const el = document.getElementById('shared-text');
         if (el) el.textContent = getAppLanguage() === 'ko' ? "서버 연결에 실패했습니다." : "Connection failed.";
     }
+}
+
+function initRoomId() {
+    const roomIdInput = document.getElementById('room-id');
+    if (!roomIdInput) return;
+    
+    let savedRoomId = localStorage.getItem('vlive_room_id');
+    if (!savedRoomId) {
+        savedRoomId = String(Math.floor(100000 + Math.random() * 900000));
+        localStorage.setItem('vlive_room_id', savedRoomId);
+    }
+    roomIdInput.value = savedRoomId;
+}
+
+function generateNewRoomId() {
+    if (sharedChannel) {
+        alert(getAppLanguage() === "ko" 
+            ? "현재 방 연결을 해제한 후 새 방번호를 생성해주세요." 
+            : "Please disconnect from the current room before generating a new room ID.");
+        return;
+    }
+    const newRoomId = String(Math.floor(100000 + Math.random() * 900000));
+    localStorage.setItem('vlive_room_id', newRoomId);
+    const roomIdInput = document.getElementById('room-id');
+    if (roomIdInput) {
+        roomIdInput.value = newRoomId;
+    }
+    showToast(getAppLanguage() === "ko" ? "새 방번호가 생성되었습니다." : "New room ID generated.");
 }
 
 
