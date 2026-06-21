@@ -45,8 +45,39 @@ async function getPublicConfig() {
 
 // ── 인증 상태 ─────────────────────────────────────────────
 
+function updateAuthErrorBanner(message) {
+    const banner = document.getElementById('auth-error-banner');
+    if (banner) {
+        if (message) {
+            const lang = typeof getAppLanguage === 'function' ? getAppLanguage() : 'ko';
+            const prefix = lang === 'ko' ? '로그인 오류: ' : 'Login Error: ';
+            banner.textContent = `${prefix}${message}`;
+            banner.style.display = 'block';
+        } else {
+            banner.textContent = '';
+            banner.style.display = 'none';
+        }
+    }
+}
+
 async function initAuthState() {
     renderAuthState();
+    
+    // Parse URL and Hash errors returned from Supabase OAuth
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get('error_description') || params.get('error');
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const hashError = hashParams.get('error_description') || hashParams.get('error');
+    const errorMsg = urlError || hashError;
+    
+    if (errorMsg) {
+        updateAuthErrorBanner(decodeURIComponent(errorMsg.replace(/\+/g, ' ')));
+        // Open the auth modal automatically so the user sees the error
+        if (typeof openAuthModal === 'function') {
+            openAuthModal();
+        }
+    }
+
     try {
         const client = await ensureSupabaseClient();
         const { data } = await client.auth.getSession();
@@ -54,6 +85,7 @@ async function initAuthState() {
         if (currentSession?.user) {
             currentUser = currentSession.user;
             localStorage.removeItem('vlive_logged_out');
+            updateAuthErrorBanner(''); // Clear error on successful session load
         }
         enforcePremiumRequiresAuth();
         renderAuthState();
@@ -63,6 +95,7 @@ async function initAuthState() {
             currentUser = currentSession?.user || null;
             if (currentUser) {
                 localStorage.removeItem('vlive_logged_out');
+                updateAuthErrorBanner(''); // Clear error on successful auth state change
             }
             enforcePremiumRequiresAuth();
             renderAuthState();
@@ -70,6 +103,9 @@ async function initAuthState() {
             if (currentUser) closeAuthModal();
         });
     } catch (e) {
+        console.error("Auth init error:", e);
+        authConfigError = e.message || String(e);
+        updateAuthErrorBanner(authConfigError);
         enforcePremiumRequiresAuth();
         renderAuthState();
     }
@@ -140,6 +176,7 @@ function renderAccountPanel() {
 }
 
 async function signInWithGoogle() {
+    updateAuthErrorBanner(''); // Clear any previous errors on retry
     try {
         const client = await ensureSupabaseClient();
         const { error } = await client.auth.signInWithOAuth({
@@ -148,7 +185,10 @@ async function signInWithGoogle() {
         });
         if (error) throw error;
     } catch (e) {
-        renderAuthState(e.message || "Google login failed.");
+        console.error("Google sign in error:", e);
+        const errMsg = e.message || String(e);
+        updateAuthErrorBanner(errMsg);
+        renderAuthState(errMsg);
         showToast("로그인 설정을 확인해 주세요.", "error", 5200);
     }
 }
