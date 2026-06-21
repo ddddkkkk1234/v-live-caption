@@ -32,6 +32,7 @@ function initLanguageControls() {
             if (k !== 'lang') url.searchParams.set(k, v);
         }
         url.searchParams.set('lang', 'en');
+        url.hash = window.location.hash;
         window.location.href = url.toString();
         return;
     } else if (saved === 'ko' && !isOnKoPage) {
@@ -40,6 +41,7 @@ function initLanguageControls() {
             if (k !== 'lang') url.searchParams.set(k, v);
         }
         url.searchParams.set('lang', 'ko');
+        url.hash = window.location.hash;
         window.location.href = url.toString();
         return;
     }
