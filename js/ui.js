@@ -441,3 +441,201 @@ function appendCaptionChunk(text, durationMs = 4000) {
     if (typeof broadcastText === 'function') broadcastText(text);
 }
 
+let sharedChannel = null;
+let currentRoomId = null;
+let isViewerMode = false;
+let lastSyncedText = "";
+
+function getShareUrl() {
+    const roomIdInput = document.getElementById('room-id');
+    const roomId = roomIdInput ? roomIdInput.value.trim() : "";
+    if (!roomId) return "";
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', roomId);
+    return url.toString();
+}
+
+function updateShareLink() {
+    // Optional dynamic UI updates when typing the room id
+}
+
+async function copyShareLink() {
+    const url = getShareUrl();
+    if (!url) {
+        alert(getAppLanguage() === "ko" ? "방 번호를 입력해주세요." : "Please enter a room ID.");
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast(getAppLanguage() === "ko" ? "공유 링크를 복사했습니다." : "Share link copied.");
+    } catch (e) {
+        showToast(getAppLanguage() === "ko" ? "복사 실패" : "Copy failed", "error");
+    }
+}
+
+async function toggleSharedConnection() {
+    const roomIdInput = document.getElementById('room-id');
+    const roomId = roomIdInput ? roomIdInput.value.trim() : "";
+    const btn = document.getElementById('shared-connect-btn');
+    
+    if (sharedChannel) {
+        sharedChannel.unsubscribe();
+        sharedChannel = null;
+        currentRoomId = null;
+        if (btn) {
+            btn.textContent = getAppLanguage() === "ko" ? "연결" : "Connect";
+            btn.classList.remove('btn-hero-stop');
+            btn.classList.add('btn-pip');
+        }
+        showToast(getAppLanguage() === "ko" ? "연결을 해제했습니다." : "Disconnected from room.");
+        return;
+    }
+    
+    if (!roomId) {
+        alert(getAppLanguage() === "ko" ? "방 번호를 입력해주세요." : "Please enter a room ID.");
+        return;
+    }
+    
+    try {
+        const client = await ensureSupabaseClient();
+        sharedChannel = client.channel(`room_${roomId}`);
+        
+        sharedChannel.on('broadcast', { event: 'request_sync' }, () => {
+            if (sharedChannel) {
+                sharedChannel.send({
+                    type: 'broadcast',
+                    event: 'sync',
+                    payload: { text: transcriptText }
+                });
+            }
+        });
+        
+        sharedChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                currentRoomId = roomId;
+                if (btn) {
+                    btn.textContent = getAppLanguage() === "ko" ? "해제" : "Disconnect";
+                    btn.classList.remove('btn-pip');
+                    btn.classList.add('btn-hero-stop');
+                }
+                showToast(getAppLanguage() === "ko" ? `방(${roomId})에 연결되었습니다.` : `Connected to room (${roomId}).`);
+                
+                sharedChannel.send({
+                    type: 'broadcast',
+                    event: 'sync',
+                    payload: { text: transcriptText }
+                });
+            }
+        });
+    } catch (e) {
+        showToast(getAppLanguage() === "ko" ? "연결 실패" : "Connection failed", "error");
+        console.error("Shared connection error:", e);
+    }
+}
+
+function broadcastText(text) {
+    if (sharedChannel && currentRoomId) {
+        sharedChannel.send({
+            type: 'broadcast',
+            event: 'sync',
+            payload: { text: transcriptText }
+        });
+    }
+}
+
+function broadcastInterim(interimText) {
+    if (sharedChannel && currentRoomId) {
+        sharedChannel.send({
+            type: 'broadcast',
+            event: 'interim',
+            payload: { text: interimText }
+        });
+    }
+}
+
+function formatSharedText(text) {
+    if (!text) return getAppLanguage() === 'ko' ? "접속 후 자막이 표시됩니다." : "Captions will appear here after connection.";
+    return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+async function checkStudentShareConnection() {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (!roomParam) return;
+    
+    isViewerMode = true;
+    document.body.classList.add('viewer-mode');
+    
+    const topbar = document.querySelector('.topbar');
+    if (topbar) {
+        const nav = topbar.querySelector('.app-nav');
+        if (nav) nav.style.display = 'none';
+        const actions = topbar.querySelector('.topbar-actions');
+        if (actions) {
+            const mypage = actions.querySelector('#mypage-btn');
+            if (mypage) mypage.style.display = 'none';
+            const volume = actions.querySelector('.volume-meter');
+            if (volume) volume.style.display = 'none';
+            const badge = actions.querySelector('#plan-badge');
+            if (badge) badge.style.display = 'none';
+        }
+    }
+    
+    const footer = document.querySelector('footer');
+    if (footer) footer.style.display = 'none';
+    const footerExtras = document.getElementById('footer-extras');
+    if (footerExtras) footerExtras.style.display = 'none';
+    const footerToggle = document.getElementById('footer-extras-toggle');
+    if (footerToggle) footerToggle.style.display = 'none';
+    
+    switchMode('shared');
+    
+    const targetContainer = document.getElementById('shared-container');
+    if (targetContainer) {
+        const cardHeader = targetContainer.querySelector('.card-header');
+        if (cardHeader) cardHeader.style.display = 'none';
+        const scrollArea = targetContainer.querySelector('.scroll-area');
+        if (scrollArea) scrollArea.style.height = '85vh';
+    }
+    
+    try {
+        const client = await ensureSupabaseClient();
+        const studentChannel = client.channel(`room_${roomParam}`);
+        
+        studentChannel.on('broadcast', { event: 'sync' }, ({ payload }) => {
+            lastSyncedText = payload.text || "";
+            const el = document.getElementById('shared-text');
+            if (el) {
+                el.innerHTML = formatSharedText(lastSyncedText);
+                const scroll = el.closest('.scroll-area');
+                if (scroll) scroll.scrollTop = scroll.scrollHeight;
+            }
+        });
+        
+        studentChannel.on('broadcast', { event: 'interim' }, ({ payload }) => {
+            const el = document.getElementById('shared-text');
+            if (el) {
+                const syncedHtml = formatSharedText(lastSyncedText);
+                const interimHtml = payload.text ? `<span style="color: rgba(255,255,255,0.4); font-weight:normal;"> ${escapeHtml(payload.text)}</span>` : "";
+                el.innerHTML = lastSyncedText ? syncedHtml + interimHtml : (payload.text ? interimHtml : formatSharedText(""));
+                const scroll = el.closest('.scroll-area');
+                if (scroll) scroll.scrollTop = scroll.scrollHeight;
+            }
+        });
+        
+        studentChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                studentChannel.send({
+                    type: 'broadcast',
+                    event: 'request_sync'
+                });
+            }
+        });
+    } catch (e) {
+        console.error("Student connection failed:", e);
+        const el = document.getElementById('shared-text');
+        if (el) el.textContent = getAppLanguage() === 'ko' ? "서버 연결에 실패했습니다." : "Connection failed.";
+    }
+}
+
+

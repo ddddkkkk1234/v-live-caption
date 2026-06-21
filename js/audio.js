@@ -160,6 +160,9 @@ function startBrowserSpeech(lang) {
         if (interimEl) {
             interimEl.innerText = interimTranscript;
         }
+        if (typeof broadcastInterim === 'function') {
+            broadcastInterim(interimTranscript);
+        }
     };
 
     browserSpeechRecognition.onerror = (event) => {

@@ -442,6 +442,9 @@
                 // 2. 인증 상태 초기화 (Supabase 연결 포함)
                 if (typeof initAuthState === 'function') await initAuthState();
                 
+                // *. 공유 모드 접속 체크 (Student auto-connect)
+                if (typeof checkStudentShareConnection === 'function') await checkStudentShareConnection();
+                
                 // 3. 설정 복원 (API 키, 스타일 등)
                 if (typeof restoreApiSettings === 'function') restoreApiSettings();
                 if (typeof restoreAiSettings === 'function') restoreAiSettings();

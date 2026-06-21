@@ -442,6 +442,9 @@
                 // 2. Auth state initialization
                 if (typeof initAuthState === 'function') await initAuthState();
                 
+                // *. Check student sharing mode
+                if (typeof checkStudentShareConnection === 'function') await checkStudentShareConnection();
+                
                 // 3. Settings restoration
                 if (typeof restoreApiSettings === 'function') restoreApiSettings();
                 if (typeof restoreAiSettings === 'function') restoreAiSettings();
