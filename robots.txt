@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://v-live-caption.pages.dev/sitemap.xml
